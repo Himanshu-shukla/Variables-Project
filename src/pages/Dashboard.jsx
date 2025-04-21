@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Grid,
   TextField,
@@ -15,12 +15,12 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-
-
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
+import { useSnackbar } from "notistack";
 import { useNavigate } from "react-router-dom";
+import { storage } from "../utils/storage";
 
 function Dashboard() {
   const navigate = useNavigate();
@@ -29,6 +29,15 @@ function Dashboard() {
   const [fromDate, setFromDate] = useState(null);
   const [toDate, setToDate] = useState(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  const [variables, setVariables] = useState([]);
+  const [selectedIdx, setSelectedIdx] = useState("");
+
+  const { enqueueSnackbar } = useSnackbar();
+
+  useEffect(() => {
+    setVariables(storage.getVariables());
+  }, []);
 
   const handleSubmit = () => {
     if (fromDate && toDate) {
@@ -41,9 +50,13 @@ function Dashboard() {
   };
 
   const handleVariableClick = () => {
+    if (selectedIdx === "") {
+      enqueueSnackbar("Please choose a variable first.", { variant: "info" });
+      return;
+    }
+    localStorage.setItem("selectedVariableIndex", selectedIdx);
     navigate("/variables");
   };
-
 
   return (
     <Grid container spacing={2} sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
@@ -107,25 +120,31 @@ function Dashboard() {
           fullWidth={isSmallScreen}
           onClick={handleVariableClick}
         >
-          Variable
+          Variables
         </Button>
       </Grid>
 
       {/* Include Dropdown */}
-      <Grid item xs={12}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} sm="auto">
-            <Typography variant={isSmallScreen ? "body2" : "body1"}>
-              Include
-            </Typography>
-          </Grid>
-          <Grid item xs={12} sm={6} md={4} lg={3}>
-            <Select fullWidth defaultValue="" size="small">
-              <MenuItem value="option1">Option 1</MenuItem>
-              <MenuItem value="option2">Option 2</MenuItem>
-            </Select>
-          </Grid>
-        </Grid>
+      <Grid item xs={12} sm={6} md={4} lg={3}>
+        <Stack direction="row" spacing={1} alignItems="center">
+          <Typography variant="subtitle1">Include</Typography>
+          <Select
+            fullWidth
+            size="small"
+            displayEmpty
+            value={selectedIdx}
+            onChange={(e) => setSelectedIdx(e.target.value)}
+          >
+            <MenuItem value="">
+              <em>Select variable…</em>
+            </MenuItem>
+            {variables.map((v, i) => (
+              <MenuItem key={i} value={i}>
+                {v.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </Stack>
       </Grid>
 
       {/* Two Dropdowns */}

@@ -43,6 +43,12 @@ export default function CreateModify() {
 
   // ------------------------- submit --------------------------
   const handleSubmit = () => {
+
+    if (!name.trim() || !dataType || !unit.trim() || initialValue === "") {
+      enqueueSnackbar("All fields are required.", { variant: "error" });
+      return;
+    }
+    
     if (name.length > 15 || unit.length > 3) {
       enqueueSnackbar("Name ≤ 15 chars, Unit ≤ 3 chars", {
         variant: "warning",
@@ -118,6 +124,7 @@ export default function CreateModify() {
             <TextField
               select
               fullWidth
+              required
               value={dataType}
               onChange={(e) => setDataType(e.target.value)}
             >
@@ -138,6 +145,7 @@ export default function CreateModify() {
           <Grid item xs={8}>
             <TextField
               fullWidth
+              required
               value={unit}
               onChange={(e) => setUnit(e.target.value)}
               slotProps={{ input: { maxLength: 3 } }}
@@ -153,6 +161,7 @@ export default function CreateModify() {
           <Grid item xs={8}>
             <TextField
               fullWidth
+              required
               value={initialValue}
               onChange={(e) => {
                 const val = e.target.value;
