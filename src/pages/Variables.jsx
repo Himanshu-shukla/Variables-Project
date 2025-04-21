@@ -45,6 +45,24 @@ export default function Variables() {
     });
   };
 
+  const handleDelete = () => {
+    if (!variables.length) return;
+
+    const updated = variables.filter((_, i) => i !== selectedIdx);
+    storage.saveVariables(updated);                    // persist
+    setVariables(updated);                             // refresh list
+
+    // fix selection
+    const newIdx = updated.length
+      ? Math.min(selectedIdx, updated.length - 1)
+      : -1;
+    setSelected(newIdx);
+    localStorage.setItem("selectedVariableIndex", newIdx);
+
+    enqueueSnackbar("Variable deleted", { variant: "info" });
+  };
+
+  
   // ---------------------------------------------------------------------
   return (
     <Grid container spacing={2} sx={{ p: 2 }}>
@@ -90,7 +108,7 @@ export default function Variables() {
         <Grid container spacing={2}>
           <Grid item><Button variant="contained" onClick={handleCreate}>Create</Button></Grid>
           <Grid item><Button variant="contained" onClick={handleModify}>Modify</Button></Grid>
-          <Grid item><Button variant="contained">Delete</Button></Grid>
+          <Grid item><Button variant="contained" onClick={handleDelete} disabled={!variables.length}>Delete</Button></Grid>
           <Grid item><Button variant="contained" onClick={() => navigate(-1)}>Back</Button></Grid>
         </Grid>
       </Grid>
