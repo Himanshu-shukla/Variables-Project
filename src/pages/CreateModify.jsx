@@ -1,36 +1,34 @@
 import React, { useEffect, useState } from "react";
-import {
-  Grid, TextField, Typography, Button, MenuItem
-} from "@mui/material";
+import { Grid, TextField, Typography, Button, MenuItem } from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSnackbar } from "notistack";
 import { storage } from "../utils/storage";
 
 const dataTypes = [
   { label: "Decimal (2 float)", value: "decimal" },
-  { label: "Integer",             value: "integer" },
-  { label: "Percentage (2 float)",value: "percentage" },
+  { label: "Integer", value: "integer" },
+  { label: "Percentage (2 float)", value: "percentage" },
 ];
 
 export default function CreateModify() {
-  const navigate        = useNavigate();
-  const { state }       = useLocation();      // { mode, index }
+  const navigate = useNavigate();
+  const { state } = useLocation(); // { mode, index }
   const { enqueueSnackbar } = useSnackbar();
 
-  const editMode  = state?.mode === "edit";
-  const editIdx   = editMode ? state.index : null;
+  const editMode = state?.mode === "edit";
+  const editIdx = editMode ? state.index : null;
 
   // ----------------------- form state -----------------------
-  const [name, setName]             = useState("");
-  const [dataType, setDataType]     = useState("decimal");
-  const [unit, setUnit]             = useState("");
-  const [initialValue, setInitial]  = useState("");
+  const [name, setName] = useState("");
+  const [dataType, setDataType] = useState("decimal");
+  const [unit, setUnit] = useState("");
+  const [initialValue, setInitial] = useState("");
 
   // ---------- if editing, pre‑load the chosen variable -------
   useEffect(() => {
     if (!editMode) return;
     const vars = storage.getVariables();
-    const v    = vars[editIdx];
+    const v = vars[editIdx];
     if (v) {
       setName(v.name);
       setDataType(v.datatype);
@@ -46,7 +44,9 @@ export default function CreateModify() {
   // ------------------------- submit --------------------------
   const handleSubmit = () => {
     if (name.length > 15 || unit.length > 3) {
-      enqueueSnackbar("Name ≤ 15 chars, Unit ≤ 3 chars", { variant: "warning" });
+      enqueueSnackbar("Name ≤ 15 chars, Unit ≤ 3 chars", {
+        variant: "warning",
+      });
       return;
     }
 
@@ -54,7 +54,10 @@ export default function CreateModify() {
       name,
       datatype: dataType,
       unit,
-      initial: dataType === "integer" ? parseInt(initialValue) : parseFloat(initialValue),
+      initial:
+        dataType === "integer"
+          ? parseInt(initialValue)
+          : parseFloat(initialValue),
       min: null,
       max: null,
     };
@@ -62,7 +65,9 @@ export default function CreateModify() {
     const vars = storage.getVariables();
 
     // duplicate‑name check (ignore current row in edit mode)
-    const duplicate = vars.some((v, idx) => v.name === name && idx !== (editIdx ?? -1));
+    const duplicate = vars.some(
+      (v, idx) => v.name === name && idx !== (editIdx ?? -1)
+    );
     if (duplicate) {
       enqueueSnackbar("Name must be unique", { variant: "error" });
       return;
@@ -70,7 +75,7 @@ export default function CreateModify() {
 
     let updated;
     if (editMode) {
-      updated        = [...vars];
+      updated = [...vars];
       updated[editIdx] = newVar;
       localStorage.setItem("selectedVariableIndex", editIdx); // keep row selected
       enqueueSnackbar("Variable updated", { variant: "success" });
@@ -90,62 +95,97 @@ export default function CreateModify() {
       {/* name */}
       <Grid item xs={12} sm={6}>
         <Grid container alignItems="center" spacing={2}>
-          <Grid item xs={4}><Typography>Name</Typography></Grid>
+          <Grid item xs={4}>
+            <Typography>Name</Typography>
+          </Grid>
           <Grid item xs={8}>
             <TextField
-              fullWidth value={name}
+              fullWidth
+              value={name}
               onChange={(e) => setName(e.target.value)}
               inputProps={{ maxLength: 15 }}
             />
           </Grid>
         </Grid>
       </Grid>
-
       {/* datatype */}
       <Grid item xs={12} sm={6}>
         <Grid container alignItems="center" spacing={2}>
-          <Grid item xs={4}><Typography>DataType</Typography></Grid>
+          <Grid item xs={4}>
+            <Typography>DataType</Typography>
+          </Grid>
           <Grid item xs={8}>
             <TextField
-              select fullWidth value={dataType}
+              select
+              fullWidth
+              value={dataType}
               onChange={(e) => setDataType(e.target.value)}
             >
               {dataTypes.map((d) => (
-                <MenuItem key={d.value} value={d.value}>{d.label}</MenuItem>
+                <MenuItem key={d.value} value={d.value}>
+                  {d.label}
+                </MenuItem>
               ))}
             </TextField>
           </Grid>
         </Grid>
       </Grid>
-
-      {/* unit */}
       <Grid item xs={12} sm={6}>
         <Grid container alignItems="center" spacing={2}>
-          <Grid item xs={4}><Typography>Unit</Typography></Grid>
+          <Grid item xs={4}>
+            <Typography>Unit</Typography>
+          </Grid>
           <Grid item xs={8}>
             <TextField
-              fullWidth value={unit}
+              fullWidth
+              value={unit}
               onChange={(e) => setUnit(e.target.value)}
-              inputProps={{ maxLength: 3 }}
+              slotProps={{ input: { maxLength: 3 } }}
             />
           </Grid>
         </Grid>
       </Grid>
-
-      {/* initial value */}
       <Grid item xs={12} sm={6}>
         <Grid container alignItems="center" spacing={2}>
-          <Grid item xs={4}><Typography>Initial Value</Typography></Grid>
+          <Grid item xs={4}>
+            <Typography>Initial Value</Typography>
+          </Grid>
           <Grid item xs={8}>
             <TextField
-              fullWidth type="number"
+              fullWidth
               value={initialValue}
-              onChange={(e) => setInitial(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+
+                // live filtering based on datatype
+                if (dataType === "integer") {
+                  if (/^\d*$/.test(val)) setInitial(val); // allow only digits
+                } else {
+                  if (/^\d*\.?\d{0,2}$/.test(val)) setInitial(val); // up to 2 decimals
+                }
+              }}
+              slotProps={{
+                input: {
+                  inputMode: "decimal",
+                  step: dataType === "integer" ? "1" : "0.01",
+                },
+              }}
+              error={
+                dataType === "integer"
+                  ? !/^\d+$/.test(initialValue) && initialValue !== ""
+                  : !/^\d+(\.\d{1,2})?$/.test(initialValue) &&
+                    initialValue !== ""
+              }
+              helperText={
+                initialValue !== "" &&
+                (dataType === "integer"
+                  ? "Must be a whole number"
+                  : "Up to 2 decimal places")
+              }
             />
           </Grid>
         </Grid>
       </Grid>
-
       {/* buttons */}
       <Grid item xs={12}>
         <Grid container spacing={2}>
@@ -155,7 +195,11 @@ export default function CreateModify() {
             </Button>
           </Grid>
           <Grid item xs={6}>
-            <Button fullWidth variant="outlined" onClick={() => navigate("/variables")}>
+            <Button
+              fullWidth
+              variant="outlined"
+              onClick={() => navigate("/variables")}
+            >
               Back
             </Button>
           </Grid>
