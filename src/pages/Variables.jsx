@@ -62,7 +62,7 @@ export default function Variables() {
     enqueueSnackbar("Variable deleted", { variant: "info" });
   };
 
-  
+
   // ---------------------------------------------------------------------
   return (
     <Grid container spacing={2} sx={{ p: 2 }}>
@@ -107,9 +107,9 @@ export default function Variables() {
       <Grid item xs={12}>
         <Grid container spacing={2}>
           <Grid item><Button variant="contained" onClick={handleCreate}>Create</Button></Grid>
-          <Grid item><Button variant="contained" onClick={handleModify}>Modify</Button></Grid>
+          <Grid item><Button variant="contained" onClick={handleModify} disabled={!variables.length}>Modify</Button></Grid>
           <Grid item><Button variant="contained" onClick={handleDelete} disabled={!variables.length}>Delete</Button></Grid>
-          <Grid item><Button variant="contained" onClick={() => navigate(-1)}>Back</Button></Grid>
+          <Grid item><Button variant="contained" onClick={() => navigate("/")}>Back</Button></Grid>
         </Grid>
       </Grid>
     </Grid>
