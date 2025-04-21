@@ -1,70 +1,80 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-  Checkbox,
-  Button,
-  Grid,
+  Grid, Table, TableHead, TableBody, TableRow,
+  TableCell, Checkbox, Button
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import { SnackbarProvider, useSnackbar } from "notistack";
-import useVariables from "../hooks/useVariables";
+import { useSnackbar } from "notistack";
 import { storage } from "../utils/storage";
 
-function Variables() {
+export default function Variables() {
   const navigate = useNavigate();
-  const [variables, setVariables] = useState([]);
-
-  useEffect(() => {
-    const storedVars = storage.getVariables();
-    setVariables(storedVars);
-  }, []);
-
   const { enqueueSnackbar } = useSnackbar();
 
-  const handleCreateClick = () => {
-    if (variables.length < 11) {
-      // OK: fewer than 11 variables
-      navigate("/create-modify");
-    } else {
-      // Block navigation + warn the user
+  // -------------------------------- state -------------------------------
+  const [variables, setVariables]   = useState([]);
+  const [selectedIdx, setSelected]  = useState(() => {
+    const idx = Number(localStorage.getItem("selectedVariableIndex"));
+    return Number.isInteger(idx) ? idx : 0;
+  });
+
+  // -------------------------- load / refresh list -----------------------
+  useEffect(() => setVariables(storage.getVariables()), []);
+
+  // ----------------------------- helpers --------------------------------
+  const handleSelect = (idx) => {
+    setSelected(idx);
+    localStorage.setItem("selectedVariableIndex", idx);
+  };
+
+  const handleCreate = () => {
+    if (variables.length >= 11) {
       enqueueSnackbar(
         "You already have 11 variables. Delete one before adding another.",
         { variant: "warning" }
       );
+      return;
     }
+    navigate("/create-modify", { state: { mode: "create" } });
   };
 
+  const handleModify = () => {
+    if (!variables.length) return;
+    navigate("/create-modify", {
+      state: { mode: "edit", index: selectedIdx },
+    });
+  };
+
+  // ---------------------------------------------------------------------
   return (
-    <Grid container spacing={2} sx={{ padding: 2 }}>
-      {/* Table */}
+    <Grid container spacing={2} sx={{ p: 2 }}>
       <Grid item xs={12}>
         <Table>
           <TableHead>
             <TableRow>
               <TableCell>Name</TableCell>
               <TableCell>Unit</TableCell>
-              <TableCell>Min Value</TableCell>
-              <TableCell>Max Value</TableCell>
-              <TableCell>Select Checkbox</TableCell>
+              <TableCell>Min</TableCell>
+              <TableCell>Max</TableCell>
+              <TableCell>Select</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {variables.map((v, i) => (
               <TableRow key={i}>
-                <TableCell>{v.name || "-"}</TableCell>
-                <TableCell>{v.unit || "-"}</TableCell>
+                <TableCell>{v.name}</TableCell>
+                <TableCell>{v.unit}</TableCell>
                 <TableCell>{v.min ?? "-"}</TableCell>
                 <TableCell>{v.max ?? "-"}</TableCell>
                 <TableCell>
-                  <Checkbox defaultChecked={i === 0} />
+                  <Checkbox
+                    checked={selectedIdx === i}
+                    onChange={() => handleSelect(i)}
+                  />
                 </TableCell>
               </TableRow>
             ))}
-            {variables.length === 0 && (
+            {!variables.length && (
               <TableRow>
                 <TableCell colSpan={5} align="center">
                   No variables found.
@@ -75,32 +85,15 @@ function Variables() {
         </Table>
       </Grid>
 
-      {/* Buttons */}
+      {/* buttons */}
       <Grid item xs={12}>
-        <Grid container spacing={2} justifyContent="flex-start">
-          <Grid item>
-            <Button variant="contained" onClick={handleCreateClick}>
-              Create
-            </Button>
-          </Grid>
-          <Grid item>
-            <Button
-              variant="contained"
-              onClick={() => navigate("/create-modify")}
-            >
-              Modify
-            </Button>
-          </Grid>
-          <Grid item>
-            <Button variant="contained">Delete</Button>
-          </Grid>
-          <Grid item>
-            <Button variant="contained">Back</Button>
-          </Grid>
+        <Grid container spacing={2}>
+          <Grid item><Button variant="contained" onClick={handleCreate}>Create</Button></Grid>
+          <Grid item><Button variant="contained" onClick={handleModify}>Modify</Button></Grid>
+          <Grid item><Button variant="contained">Delete</Button></Grid>
+          <Grid item><Button variant="contained" onClick={() => navigate(-1)}>Back</Button></Grid>
         </Grid>
       </Grid>
     </Grid>
   );
 }
-
-export default Variables;
