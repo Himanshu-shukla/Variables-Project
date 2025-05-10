@@ -24,15 +24,15 @@ const set = (key, value) => localStorage.setItem(key, JSON.stringify(value));
 // ---------- public API ---------------------------------------
 export const storage = {
   /* 1️⃣ variables ------------------------------------------------ */
-  getVariables: () => get(VAR_KEY),
+  getVariables: () => get(VAR_KEY, []),
   saveVariables: (vars) => set(VAR_KEY, vars),
 
   /* 2️⃣ variable changes ----------------------------------------- */
-  getVariableChanges: () => get(VAR_CHANGES_KEY),
+  getVariableChanges: () => get(VAR_CHANGES_KEY, []),
   saveVariableChanges: (rows) => set(VAR_CHANGES_KEY, rows),
 
   /* 3️⃣ master table --------------------------------------------- */
-  getMasterRows: () => get(MASTER_KEY),
+  getMasterRows: () => get(MASTER_KEY, []),
   saveMasterRows: (rows) => set(MASTER_KEY, rows),
 
   /* 3a  add a new column to every row when a variable is created  */

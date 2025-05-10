@@ -1,14 +1,182 @@
 import React, { useEffect, useState } from "react";
-import { Grid, TextField, Typography, Button, MenuItem } from "@mui/material";
+import {
+  Box,
+  Paper,
+  Grid,
+  Typography,
+  Checkbox,
+  TextField,
+  Select,
+  MenuItem,
+  IconButton,
+  Button,
+} from "@mui/material";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useSnackbar } from "notistack";
+import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
+import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
+import DeleteIcon from "@mui/icons-material/Delete";
 import { storage } from "../utils/storage";
+
 
 const dataTypes = [
   { label: "Decimal (2 float)", value: "decimal" },
   { label: "Integer", value: "integer" },
   { label: "Percentage (2 float)", value: "percentage" },
 ];
+
+const BETWEEN_OPTIONS = [
+  "Date of Month",
+  "Date of Quarter",
+  "Date of Year",
+  "Day of Week",
+  "Number of days (from start date of change date range)",
+];
+
+const BY_OPERATIONS = [
+  "Add",
+  "Subtract",
+  "Multiply",
+  "Divide",
+  "To power",
+  "Remainder",
+  "Truncate",
+  "Modulus",
+  "Round",
+  "Roundup",
+  "Rounddown",
+  "AND",
+  "OR",
+  "NOT",
+  "IF(,,)",
+];
+
+
+function ChangePanel({ idx, data, onChange, onDelete }) {
+  const handleField = (field, value) => {
+    onChange(idx, { ...data, [field]: value });
+  };
+
+  return (
+    <Paper variant="outlined" className="p-4 rounded-2xl shadow-sm mb-4">
+      <Grid container spacing={2} alignItems="center">
+        {/* Row 1 – Checkbox, Start / End date headers */}
+        <Grid item xs={12} sm={2} md={1}>
+          <Checkbox
+            checked={data.enabled}
+            onChange={(e) => handleField("enabled", e.target.checked)}
+          />
+        </Grid>
+        <Grid item xs={6} sm={5} md={3}>
+          <Typography variant="subtitle2">Start date</Typography>
+        </Grid>
+        <Grid item xs={6} sm={5} md={3}>
+          <Typography variant="subtitle2">End date</Typography>
+        </Grid>
+
+        {/* Row 2 – Date pickers */}
+        <Grid item xs={12} sm={2} md={1} /> {/* spacer under checkbox */}
+        <Grid item xs={6} sm={5} md={3}>
+          <LocalizationProvider dateAdapter={AdapterDateFns}>
+            <DatePicker
+              value={data.startDate}
+              onChange={(d) => handleField("startDate", d)}
+              slotProps={{ textField: { size: "small", fullWidth: true } }}
+            />
+          </LocalizationProvider>
+        </Grid>
+        <Grid item xs={6} sm={5} md={3}>
+          <LocalizationProvider dateAdapter={AdapterDateFns}>
+            <DatePicker
+              value={data.endDate}
+              onChange={(d) => handleField("endDate", d)}
+              slotProps={{ textField: { size: "small", fullWidth: true } }}
+            />
+          </LocalizationProvider>
+        </Grid>
+
+        {/* Row 3 – "Change", "Between" labels */}
+        <Grid item xs={12} sm={2} md={1}>
+          <Typography variant="subtitle2">Change</Typography>
+        </Grid>
+        <Grid item xs={6} sm={5} md={3}>
+          <Typography variant="subtitle2">Between</Typography>
+        </Grid>
+        <Grid item xs={6} sm={5} md={3} />
+
+        {/* Row 4 – "Every" label + Between select */}
+        <Grid item xs={12} sm={2} md={1}>
+          <Typography variant="body2">Every</Typography>
+        </Grid>
+        <Grid item xs={6} sm={5} md={3}>
+          <Select
+            fullWidth
+            size="small"
+            value={data.between}
+            onChange={(e) => handleField("between", e.target.value)}
+          >
+            {BETWEEN_OPTIONS.map((opt) => (
+              <MenuItem key={opt} value={opt}>
+                {opt}
+              </MenuItem>
+            ))}
+          </Select>
+        </Grid>
+        <Grid item xs={6} sm={5} md={3} />
+
+        {/* Row 5 – On Previous Value / By ... dropdown */}
+        <Grid item xs={12} sm={2} md={1}>
+          <Typography variant="body2">On previous value</Typography>
+        </Grid>
+        <Grid item xs={6} sm={5} md={3}>
+          <Typography variant="body2">By</Typography>
+        </Grid>
+        <Grid item xs={6} sm={5} md={3}>
+          <Select
+            fullWidth
+            size="small"
+            value={data.by}
+            onChange={(e) => handleField("by", e.target.value)}
+          >
+            {BY_OPERATIONS.map((op) => (
+              <MenuItem key={op} value={op}>
+                {op}
+              </MenuItem>
+            ))}
+          </Select>
+        </Grid>
+
+        {/* Row 6 – (OR) Set to */}
+        <Grid item xs={12} sm={2} md={1}>
+          <Typography variant="caption" color="text.secondary">
+            (OR)
+          </Typography>
+        </Grid>
+        <Grid item xs={6} sm={5} md={3}>
+          <Typography variant="body2">Set to</Typography>
+        </Grid>
+        <Grid item xs={6} sm={5} md={3}>
+          <TextField
+            fullWidth
+            size="small"
+            value={data.setTo}
+            onChange={(e) => handleField("setTo", e.target.value)}
+          />
+        </Grid>
+
+        {/* Row 7 – Delete button */}
+        <Grid item xs={12}>
+          <Box textAlign="right">
+            <IconButton color="error" onClick={() => onDelete(idx)}>
+              <DeleteIcon />
+            </IconButton>
+          </Box>
+        </Grid>
+      </Grid>
+    </Paper>
+  );
+}
+
 
 export default function CreateModify() {
   const navigate = useNavigate();
@@ -23,6 +191,40 @@ export default function CreateModify() {
   const [dataType, setDataType] = useState("decimal");
   const [unit, setUnit] = useState("");
   const [initialValue, setInitial] = useState("");
+
+  const [changes, setChanges] = useState([
+    {
+      enabled: false,
+      startDate: null,
+      endDate: null,
+      between: BETWEEN_OPTIONS[0],
+      by: BY_OPERATIONS[0],
+      setTo: "",
+    },
+  ]);
+
+  const updateChange = (idx, patch) => {
+    setChanges((prev) => prev.map((c, i) => (i === idx ? patch : c)));
+  };
+
+  const addChange = () => {
+    setChanges((prev) => [
+      ...prev,
+      {
+        enabled: false,
+        startDate: null,
+        endDate: null,
+        between: BETWEEN_OPTIONS[0],
+        by: BY_OPERATIONS[0],
+        setTo: "",
+      },
+    ]);
+  };
+
+  const deleteChange = (idx) => {
+    setChanges((prev) => prev.filter((_, i) => i !== idx));
+  };
+
 
   // ---------- if editing, pre‑load the chosen variable -------
   useEffect(() => {
@@ -198,7 +400,26 @@ export default function CreateModify() {
           </Grid>
         </Grid>
       </Grid>
-      {/* buttons */}
+      <Box className="p-4 space-y-4">
+      {changes.map((panel, idx) => (
+        <ChangePanel
+          key={idx}
+          idx={idx}
+          data={panel}
+          onChange={updateChange}
+          onDelete={deleteChange}
+        />
+      ))}
+
+      <Box display="flex" justifyContent="space-between" mt={2}>
+        <Button variant="contained" onClick={addChange}>
+          Add another change
+        </Button>
+        <Button variant="outlined" color="primary">
+          Submit
+        </Button>
+      </Box>
+    </Box>
       <Grid item xs={12}>
         <Grid container spacing={2}>
           <Grid item xs={6}>

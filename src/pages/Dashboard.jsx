@@ -23,9 +23,8 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import { useNavigate } from "react-router-dom";
 import { storage } from "../utils/storage";
-import { splitIntoPeriods, formatDMY } from "../utils/dateMath"
-import { calcMetric } from "../utils/metrics"
-
+import { splitIntoPeriods, formatDMY } from "../utils/dateMath";
+import { calcMetric } from "../utils/metrics";
 
 const PERIODS = ["Daily", "Weekly", "Monthly", "Quarterly", "Annual"];
 const METRICS = ["Average", "Median", "Mode", "Max", "Min"];
@@ -79,23 +78,26 @@ function Dashboard() {
       });
       return;
     }
-  
+
     // 1️⃣  header row
-    const header = ["Variable / Unit", ...tableData.periods.map((p) => formatDMY(p.end))];
-  
+    const header = [
+      "Variable / Unit",
+      ...tableData.periods.map((p) => formatDMY(p.end)),
+    ];
+
     // 2️⃣  data rows
     const rows = tableData.rows.map((r) => [
       `${r.name} (${r.unit})`,
       ...r.vals,
     ]);
-  
+
     const aoa = [header, ...rows]; // array-of-arrays
-  
+
     // 3️⃣  build workbook
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(aoa);
     XLSX.utils.book_append_sheet(wb, ws, "Summary");
-  
+
     // 4️⃣  create blob & save
     const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     const fileName = `data_${periodicity}_${metric}.xlsx`;
@@ -213,7 +215,7 @@ function Dashboard() {
             <MenuItem value="">
               <em>Select variable…</em>
             </MenuItem>
-            {variables.map((v, i) => (
+            {(variables || []).map((v, i) => (
               <MenuItem key={i} value={i}>
                 {v.name}
               </MenuItem>
@@ -283,7 +285,11 @@ function Dashboard() {
 
       {/* Download Button */}
       <Grid item xs={12} sx={{ textAlign: { xs: "center", sm: "right" } }}>
-        <Button variant="contained" size={isSmallScreen ? "small" : "medium"} onClick={handleDownload}>
+        <Button
+          variant="contained"
+          size={isSmallScreen ? "small" : "medium"}
+          onClick={handleDownload}
+        >
           Download
         </Button>
       </Grid>
