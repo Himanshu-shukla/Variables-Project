@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from "react";
 import {
-  Grid, Table, TableHead, TableBody, TableRow,
-  TableCell, Checkbox, Button
+  Grid,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  TableCell,
+  Checkbox,
+  Button,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useSnackbar } from "notistack";
@@ -12,8 +18,8 @@ export default function Variables() {
   const { enqueueSnackbar } = useSnackbar();
 
   // -------------------------------- state -------------------------------
-  const [variables, setVariables]   = useState([]);
-  const [selectedIdx, setSelected]  = useState(() => {
+  const [variables, setVariables] = useState([]);
+  const [selectedIdx, setSelected] = useState(() => {
     const idx = Number(localStorage.getItem("selectedVariableIndex"));
     return Number.isInteger(idx) ? idx : 0;
   });
@@ -35,13 +41,15 @@ export default function Variables() {
       );
       return;
     }
-    navigate("/create-modify", { state: { mode: "create" } });
+    navigate("/create-modify", {
+      state: { pageMode: "variable", mode: "create" },
+    });
   };
 
   const handleModify = () => {
     if (!variables.length) return;
     navigate("/create-modify", {
-      state: { mode: "edit", index: selectedIdx },
+      state: { pageMode: "variable", mode: "edit", editIdx : selectedIdx },
     });
   };
 
@@ -49,8 +57,8 @@ export default function Variables() {
     if (!variables.length) return;
 
     const updated = variables.filter((_, i) => i !== selectedIdx);
-    storage.saveVariables(updated);                    // persist
-    setVariables(updated);                             // refresh list
+    storage.saveVariables(updated); // persist
+    setVariables(updated); // refresh list
 
     // fix selection
     const newIdx = updated.length
@@ -61,7 +69,6 @@ export default function Variables() {
 
     enqueueSnackbar("Variable deleted", { variant: "info" });
   };
-
 
   // ---------------------------------------------------------------------
   return (
@@ -106,10 +113,34 @@ export default function Variables() {
       {/* buttons */}
       <Grid item xs={12}>
         <Grid container spacing={2}>
-          <Grid item><Button variant="contained" onClick={handleCreate}>Create</Button></Grid>
-          <Grid item><Button variant="contained" onClick={handleModify} disabled={!variables.length}>Modify</Button></Grid>
-          <Grid item><Button variant="contained" onClick={handleDelete} disabled={!variables.length}>Delete</Button></Grid>
-          <Grid item><Button variant="contained" onClick={() => navigate("/")}>Back</Button></Grid>
+          <Grid item>
+            <Button variant="contained" onClick={handleCreate}>
+              Create
+            </Button>
+          </Grid>
+          <Grid item>
+            <Button
+              variant="contained"
+              onClick={handleModify}
+              disabled={!variables.length}
+            >
+              Modify
+            </Button>
+          </Grid>
+          <Grid item>
+            <Button
+              variant="contained"
+              onClick={handleDelete}
+              disabled={!variables.length}
+            >
+              Delete
+            </Button>
+          </Grid>
+          <Grid item>
+            <Button variant="contained" onClick={() => navigate("/")}>
+              Back
+            </Button>
+          </Grid>
         </Grid>
       </Grid>
     </Grid>

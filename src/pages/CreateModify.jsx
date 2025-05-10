@@ -17,6 +17,8 @@ import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { storage } from "../utils/storage";
+import { ruleMatches, applyBy } from "../utils/ruleEngine";
+import { format } from "date-fns";
 
 const dataTypes = [
   { label: "Decimal (2 float)", value: "decimal" },
@@ -31,7 +33,6 @@ const BETWEEN_TYPE_OPTIONS = [
   "Day of Week",
   "Number of days (from start date of change date range)",
 ];
-
 
 function ChangePanel({ idx, data, onChange, onDelete }) {
   const handleField = (field, value) => {
@@ -115,7 +116,7 @@ function ChangePanel({ idx, data, onChange, onDelete }) {
           <Select
             fullWidth
             size="small"
-            value={data.onType}
+            value={data.onType || "On Previous Value"}
             onChange={(e) => handleField("onType", e.target.value)}
           >
             <MenuItem value="On Previous Value">On Previous Value</MenuItem>
@@ -151,14 +152,6 @@ function ChangePanel({ idx, data, onChange, onDelete }) {
             onChange={(e) => handleField("setTo", e.target.value)}
           />
         </Grid>
-        {/* Row 7 – Delete button */}
-        <Grid item xs={12}>
-          <Box textAlign="right">
-            <IconButton color="error" onClick={() => onDelete(idx)}>
-              <DeleteIcon />
-            </IconButton>
-          </Box>
-        </Grid>
       </Grid>
     </Paper>
   );
@@ -169,8 +162,9 @@ export default function CreateModify() {
   const { state } = useLocation(); // { mode, index }
   const { enqueueSnackbar } = useSnackbar();
 
+  const pageMode = state?.pageMode ?? "variable";
   const editMode = state?.mode === "edit";
-  const editIdx = editMode ? state.index : null;
+  const editIdx = state?.editIdx ?? -1;
 
   // ----------------------- form state -----------------------
   const [name, setName] = useState("");
@@ -231,7 +225,7 @@ export default function CreateModify() {
   }, []);
 
   // ------------------------- submit --------------------------
-  const handleSubmit = () => {
+  const handleSubmitVariable = () => {
     if (!name.trim() || !dataType || !unit.trim() || initialValue === "") {
       enqueueSnackbar("All fields are required.", { variant: "error" });
       return;
@@ -244,7 +238,7 @@ export default function CreateModify() {
       return;
     }
 
-    const integerValue =
+    const parsedInit =
       dataType === "integer"
         ? parseInt(initialValue)
         : parseFloat(initialValue);
@@ -253,14 +247,14 @@ export default function CreateModify() {
       name,
       datatype: dataType,
       unit,
-      initial: integerValue,
-      min: integerValue,
-      max: integerValue,
+      initial: parsedInit,
+      min: parsedInit,
+      max: parsedInit,
     };
 
     const vars = storage.getVariables();
 
-    // duplicate‑name check (ignore current row in edit mode)
+    // duplicate-name check (ignore current row in edit mode)
     const duplicate = vars.some(
       (v, idx) => v.name === name && idx !== (editIdx ?? -1)
     );
@@ -269,22 +263,128 @@ export default function CreateModify() {
       return;
     }
 
-    let updated;
+    let updatedVars;
     if (editMode) {
-      updated = [...vars];
-      updated[editIdx] = newVar;
-      localStorage.setItem("selectedVariableIndex", editIdx); // keep row selected
+      const oldVar = vars[editIdx];
+      updatedVars = [...vars];
+      updatedVars[editIdx] = newVar;
+      localStorage.setItem("selectedVariableIndex", editIdx);
       enqueueSnackbar("Variable updated", { variant: "success" });
+
+      // --- column rename if name changed ----------------------
+      if (oldVar.name !== name) {
+        storage.renameColumnInMaster(oldVar.name, name);
+
+        // also rename in variableChanges
+        const changes = storage.getVariableChanges();
+        const patched = changes.map((c) =>
+          c.variableName === oldVar.name ? { ...c, variableName: name } : c
+        );
+        storage.saveVariableChanges(patched);
+      }
+
+      // --- initial value change: patch rows before first change
+      if (oldVar.initial !== parsedInit) {
+        const firstChange = storage
+          .getVariableChanges()
+          .filter((c) => c.variableName === name)
+          .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))[0];
+
+        const cutOffISO = firstChange
+          ? firstChange.startDate
+          : localStorage.getItem("toDate");
+        storage.patchInitialValues(name, parsedInit, cutOffISO);
+      }
     } else {
-      updated = [...vars, newVar];
-      localStorage.setItem("selectedVariableIndex", updated.length - 1);
+      // ---------- CREATE mode ---------------------------------
+      updatedVars = [...vars, newVar];
+      localStorage.setItem("selectedVariableIndex", updatedVars.length - 1);
       enqueueSnackbar("Variable created", { variant: "success" });
 
-      storage.addColumnToMaster({ name, initial: integerValue });
+      storage.addColumnToMaster({ name, initial: parsedInit });
     }
 
-    storage.saveVariables(updated);
+    storage.saveVariables(updatedVars);
     navigate("/variables");
+  };
+
+  const handleSubmitChange = () => {
+    const fromLS = new Date(localStorage.getItem("fromDate"));
+    const toLS = new Date(localStorage.getItem("toDate"));
+
+    for (const c of changes) {
+      if (!c.startDate || !c.endDate || !c.betweenValue)
+        return enqueueSnackbar("All Change fields must be filled.", {
+          variant: "error",
+        });
+
+      if (c.startDate < fromLS || c.endDate > toLS)
+        return enqueueSnackbar(
+          "Start / End must lie inside Dashboard date range.",
+          { variant: "error" }
+        );
+
+      if (c.onType === "On Previous Value" && +c.startDate === +fromLS)
+        return enqueueSnackbar(
+          "Start date must be after overall From date for ‘On Previous Value’.",
+          { variant: "error" }
+        );
+
+      if (!(c.by || c.setTo))
+        return enqueueSnackbar("Either BY or SET TO must be provided.", {
+          variant: "error",
+        });
+    }
+
+    // 2️⃣  persist to variableChanges table ----------------------
+    const varName = name.trim();
+    const prevChanges = storage.getVariableChanges();
+    const nextChanges = [
+      ...prevChanges.filter((r) => r.name !== varName),
+      ...changes.map((c, i) => ({
+        name: varName,
+        changeNo: i + 1,
+        startDate: format(c.startDate, "dd MMM yy"),
+        endDate: format(c.endDate, "dd MMM yy"),
+        every: `${c.betweenValue} ${c.betweenType}`,
+        by: c.by,
+        setTo: c.setTo,
+      })),
+    ];
+    storage.saveVariableChanges(nextChanges);
+
+    // 3️⃣  mutate master table ------------------------------------
+    let rows = storage.getMasterRows(); // already sorted chronologically
+    const initVal = rows.find((r) => r[varName] !== undefined)[varName];
+
+    // sort changes by startDate so we walk once
+    const sorted = [...changes].sort((a, b) => a.startDate - b.startDate);
+
+    let currentVal = initVal;
+    rows = rows.map((r) => {
+      const d = new Date(r.date);
+
+      // is this row affected by any change?
+      sorted.forEach((ch) => {
+        if (
+          d >= ch.startDate &&
+          d <= ch.endDate &&
+          ruleMatches(ch, d, ch.startDate)
+        ) {
+          if (ch.onType === "On Previous Value") {
+            currentVal = ch.by ? applyBy(currentVal, ch.by) : Number(ch.setTo);
+          } else {
+            // Independent
+            currentVal = ch.setTo ? Number(ch.setTo) : applyBy(initVal, ch.by);
+          }
+        }
+      });
+
+      return { ...r, [varName]: Number(currentVal.toFixed(2)) };
+    });
+
+    storage.saveMasterRows(rows);
+    enqueueSnackbar("Changes applied!", { variant: "success" });
   };
 
   // ------------------------- UI ------------------------------
@@ -399,18 +499,31 @@ export default function CreateModify() {
         ))}
 
         <Box display="flex" justifyContent="space-between" mt={2}>
-          <Button variant="contained" onClick={addChange}>
-            Add another change
-          </Button>
-          <Button variant="outlined" color="primary">
-            Submit
-          </Button>
+          <Box sx={{ width: "25%" }}>
+            <Button variant="contained" onClick={addChange}>
+              Add another change
+            </Button>
+          </Box>
+
+          <Box sx={{ width: "50%", display: "flex", justifyContent: "left" }}>
+            <Button variant="outlined" color="error" onClick={deleteChange}>
+              Delete Change
+            </Button>
+          </Box>
         </Box>
       </Box>
       <Grid item xs={12}>
         <Grid container spacing={2}>
           <Grid item xs={6}>
-            <Button fullWidth variant="contained" onClick={handleSubmit}>
+            <Button
+              fullWidth
+              variant="contained"
+              onClick={
+                pageMode !== "change"
+                  ? handleSubmitChange
+                  : handleSubmitVariable
+              }
+            >
               Submit
             </Button>
           </Grid>
