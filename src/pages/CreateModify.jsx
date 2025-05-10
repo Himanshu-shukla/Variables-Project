@@ -18,37 +18,18 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import DeleteIcon from "@mui/icons-material/Delete";
 import { storage } from "../utils/storage";
 
-
 const dataTypes = [
   { label: "Decimal (2 float)", value: "decimal" },
   { label: "Integer", value: "integer" },
   { label: "Percentage (2 float)", value: "percentage" },
 ];
 
-const BETWEEN_OPTIONS = [
+const BETWEEN_TYPE_OPTIONS = [
   "Date of Month",
   "Date of Quarter",
   "Date of Year",
   "Day of Week",
   "Number of days (from start date of change date range)",
-];
-
-const BY_OPERATIONS = [
-  "Add",
-  "Subtract",
-  "Multiply",
-  "Divide",
-  "To power",
-  "Remainder",
-  "Truncate",
-  "Modulus",
-  "Round",
-  "Roundup",
-  "Rounddown",
-  "AND",
-  "OR",
-  "NOT",
-  "IF(,,)",
 ];
 
 
@@ -73,7 +54,6 @@ function ChangePanel({ idx, data, onChange, onDelete }) {
         <Grid item xs={6} sm={5} md={3}>
           <Typography variant="subtitle2">End date</Typography>
         </Grid>
-
         {/* Row 2 – Date pickers */}
         <Grid item xs={12} sm={2} md={1} /> {/* spacer under checkbox */}
         <Grid item xs={6} sm={5} md={3}>
@@ -94,7 +74,6 @@ function ChangePanel({ idx, data, onChange, onDelete }) {
             />
           </LocalizationProvider>
         </Grid>
-
         {/* Row 3 – "Change", "Between" labels */}
         <Grid item xs={12} sm={2} md={1}>
           <Typography variant="subtitle2">Change</Typography>
@@ -103,7 +82,6 @@ function ChangePanel({ idx, data, onChange, onDelete }) {
           <Typography variant="subtitle2">Between</Typography>
         </Grid>
         <Grid item xs={6} sm={5} md={3} />
-
         {/* Row 4 – "Every" label + Between select */}
         <Grid item xs={12} sm={2} md={1}>
           <Typography variant="body2">Every</Typography>
@@ -115,37 +93,47 @@ function ChangePanel({ idx, data, onChange, onDelete }) {
             value={data.between}
             onChange={(e) => handleField("between", e.target.value)}
           >
-            {BETWEEN_OPTIONS.map((opt) => (
+            {BETWEEN_TYPE_OPTIONS.map((opt) => (
               <MenuItem key={opt} value={opt}>
                 {opt}
               </MenuItem>
             ))}
           </Select>
         </Grid>
+        <Grid item xs={6} sm={4} md={4}>
+          <TextField
+            fullWidth
+            size="small"
+            placeholder="Enter value (e.g., Monday, 1, 2)"
+            value={data.betweenValue}
+            onChange={(e) => handleField("betweenValue", e.target.value)}
+          />
+        </Grid>
         <Grid item xs={6} sm={5} md={3} />
-
         {/* Row 5 – On Previous Value / By ... dropdown */}
         <Grid item xs={12} sm={2} md={1}>
-          <Typography variant="body2">On previous value</Typography>
+          <Select
+            fullWidth
+            size="small"
+            value={data.onType}
+            onChange={(e) => handleField("onType", e.target.value)}
+          >
+            <MenuItem value="On Previous Value">On Previous Value</MenuItem>
+            <MenuItem value="Independent">Independent</MenuItem>
+          </Select>
         </Grid>
         <Grid item xs={6} sm={5} md={3}>
           <Typography variant="body2">By</Typography>
         </Grid>
         <Grid item xs={6} sm={5} md={3}>
-          <Select
+          <TextField
             fullWidth
             size="small"
             value={data.by}
             onChange={(e) => handleField("by", e.target.value)}
-          >
-            {BY_OPERATIONS.map((op) => (
-              <MenuItem key={op} value={op}>
-                {op}
-              </MenuItem>
-            ))}
-          </Select>
+            placeholder="Enter expression (e.g. +2, *var, IF(,,))"
+          />
         </Grid>
-
         {/* Row 6 – (OR) Set to */}
         <Grid item xs={12} sm={2} md={1}>
           <Typography variant="caption" color="text.secondary">
@@ -163,7 +151,6 @@ function ChangePanel({ idx, data, onChange, onDelete }) {
             onChange={(e) => handleField("setTo", e.target.value)}
           />
         </Grid>
-
         {/* Row 7 – Delete button */}
         <Grid item xs={12}>
           <Box textAlign="right">
@@ -176,7 +163,6 @@ function ChangePanel({ idx, data, onChange, onDelete }) {
     </Paper>
   );
 }
-
 
 export default function CreateModify() {
   const navigate = useNavigate();
@@ -192,16 +178,18 @@ export default function CreateModify() {
   const [unit, setUnit] = useState("");
   const [initialValue, setInitial] = useState("");
 
-  const [changes, setChanges] = useState([
-    {
-      enabled: false,
-      startDate: null,
-      endDate: null,
-      between: BETWEEN_OPTIONS[0],
-      by: BY_OPERATIONS[0],
-      setTo: "",
-    },
-  ]);
+  const defaultPanel = {
+    enabled: false,
+    startDate: null,
+    endDate: null,
+    between: BETWEEN_TYPE_OPTIONS[0],
+    betweenValue: "",
+    onType: "On Previous Value",
+    by: "",
+    setTo: "",
+  };
+
+  const [changes, setChanges] = useState([defaultPanel]);
 
   const updateChange = (idx, patch) => {
     setChanges((prev) => prev.map((c, i) => (i === idx ? patch : c)));
@@ -214,8 +202,8 @@ export default function CreateModify() {
         enabled: false,
         startDate: null,
         endDate: null,
-        between: BETWEEN_OPTIONS[0],
-        by: BY_OPERATIONS[0],
+        between: BETWEEN_TYPE_OPTIONS[0],
+        by: "",
         setTo: "",
       },
     ]);
@@ -224,7 +212,6 @@ export default function CreateModify() {
   const deleteChange = (idx) => {
     setChanges((prev) => prev.filter((_, i) => i !== idx));
   };
-
 
   // ---------- if editing, pre‑load the chosen variable -------
   useEffect(() => {
@@ -245,12 +232,11 @@ export default function CreateModify() {
 
   // ------------------------- submit --------------------------
   const handleSubmit = () => {
-
     if (!name.trim() || !dataType || !unit.trim() || initialValue === "") {
       enqueueSnackbar("All fields are required.", { variant: "error" });
       return;
     }
-    
+
     if (name.length > 15 || unit.length > 3) {
       enqueueSnackbar("Name ≤ 15 chars, Unit ≤ 3 chars", {
         variant: "warning",
@@ -258,15 +244,16 @@ export default function CreateModify() {
       return;
     }
 
-    const integerValue =  dataType === "integer"
-    ? parseInt(initialValue)
-    : parseFloat(initialValue)
+    const integerValue =
+      dataType === "integer"
+        ? parseInt(initialValue)
+        : parseFloat(initialValue);
 
     const newVar = {
       name,
       datatype: dataType,
       unit,
-      initial: integerValue, 
+      initial: integerValue,
       min: integerValue,
       max: integerValue,
     };
@@ -401,25 +388,25 @@ export default function CreateModify() {
         </Grid>
       </Grid>
       <Box className="p-4 space-y-4">
-      {changes.map((panel, idx) => (
-        <ChangePanel
-          key={idx}
-          idx={idx}
-          data={panel}
-          onChange={updateChange}
-          onDelete={deleteChange}
-        />
-      ))}
+        {changes.map((panel, idx) => (
+          <ChangePanel
+            key={idx}
+            idx={idx}
+            data={panel}
+            onChange={updateChange}
+            onDelete={deleteChange}
+          />
+        ))}
 
-      <Box display="flex" justifyContent="space-between" mt={2}>
-        <Button variant="contained" onClick={addChange}>
-          Add another change
-        </Button>
-        <Button variant="outlined" color="primary">
-          Submit
-        </Button>
+        <Box display="flex" justifyContent="space-between" mt={2}>
+          <Button variant="contained" onClick={addChange}>
+            Add another change
+          </Button>
+          <Button variant="outlined" color="primary">
+            Submit
+          </Button>
+        </Box>
       </Box>
-    </Box>
       <Grid item xs={12}>
         <Grid container spacing={2}>
           <Grid item xs={6}>
