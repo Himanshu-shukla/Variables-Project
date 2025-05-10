@@ -56,16 +56,17 @@ export default function CreateModify() {
       return;
     }
 
+    const integerValue =  dataType === "integer"
+    ? parseInt(initialValue)
+    : parseFloat(initialValue)
+
     const newVar = {
       name,
       datatype: dataType,
       unit,
-      initial:
-        dataType === "integer"
-          ? parseInt(initialValue)
-          : parseFloat(initialValue),
-      min: null,
-      max: null,
+      initial: integerValue, 
+      min: integerValue,
+      max: integerValue,
     };
 
     const vars = storage.getVariables();
@@ -89,6 +90,8 @@ export default function CreateModify() {
       updated = [...vars, newVar];
       localStorage.setItem("selectedVariableIndex", updated.length - 1);
       enqueueSnackbar("Variable created", { variant: "success" });
+
+      storage.addColumnToMaster({ name, initial: integerValue });
     }
 
     storage.saveVariables(updated);

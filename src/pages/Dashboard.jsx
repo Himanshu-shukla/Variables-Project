@@ -50,10 +50,10 @@ function Dashboard() {
   };
 
   const handleVariableClick = () => {
-    if (selectedIdx === "") {
-      enqueueSnackbar("Please choose a variable first.", { variant: "info" });
-      return;
-    }
+    // if (selectedIdx === "") {
+    //   enqueueSnackbar("Please choose a variable first.", { variant: "info" });
+    //   return;
+    // }
     localStorage.setItem("selectedVariableIndex", selectedIdx);
     navigate("/variables");
   };
