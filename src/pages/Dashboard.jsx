@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Grid,
   TextField,
@@ -21,14 +21,24 @@ import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { useSnackbar } from "notistack";
 import { useNavigate } from "react-router-dom";
 import { storage } from "../utils/storage";
+import { splitIntoPeriods, formatDMY } from "../utils/dateMath"
+import { calcMetric } from "../utils/metrics"
+
+
+const PERIODS = ["Daily", "Weekly", "Monthly", "Quarterly", "Annual"];
+const METRICS = ["Average", "Median", "Mode", "Max", "Min"];
 
 function Dashboard() {
   const navigate = useNavigate();
   const theme = useTheme();
   const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
+
   const [fromDate, setFromDate] = useState(null);
   const [toDate, setToDate] = useState(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
+
+  const [periodicity, setPeriodicity] = useState("Monthly");
+  const [metric, setMetric] = useState("Average");
 
   const [variables, setVariables] = useState([]);
   const [selectedIdx, setSelectedIdx] = useState("");
@@ -37,6 +47,17 @@ function Dashboard() {
 
   useEffect(() => {
     setVariables(storage.getVariables());
+  }, []);
+
+  useEffect(() => {
+    const fd = localStorage.getItem("fromDate");
+    const td = localStorage.getItem("toDate");
+
+    if (fd) setFromDate(new Date(fd));
+    if (td) setToDate(new Date(td));
+
+    // disable pickers if both dates were already chosen
+    if (fd && td) setIsSubmitted(true);
   }, []);
 
   const handleSubmit = () => {
@@ -48,6 +69,28 @@ function Dashboard() {
       alert("Please select both dates before submitting.");
     }
   };
+
+  const tableData = useMemo(() => {
+    if (!fromDate || !toDate) return { periods: [], rows: [] };
+
+    const masterRows = storage.getMasterRows();
+    if (!masterRows.length) return { periods: [], rows: [] };
+
+    const periods = splitIntoPeriods(fromDate, toDate, periodicity);
+
+    const rows = variables.map((v) => {
+      const vals = periods.map(({ start, end }) => {
+        const inRange = masterRows.filter((r) => {
+          const d = new Date(r.date); // assumes r.date is ISO or parseable
+          return d >= start && d <= end;
+        });
+        const periodValues = inRange.map((r) => r[v.name]);
+        return calcMetric(periodValues, metric);
+      });
+      return { ...v, vals };
+    });
+    return { periods, rows };
+  }, [fromDate, toDate, periodicity, metric, variables]);
 
   const handleVariableClick = () => {
     // if (selectedIdx === "") {
@@ -149,21 +192,29 @@ function Dashboard() {
 
       {/* Two Dropdowns */}
       <Grid item xs={12} sm={6} md={4}>
-        <Select fullWidth defaultValue="Daily" size="small">
-          {["Daily", "Weekly", "Monthly", "Quarterly", "Annual"].map(
-            (option) => (
-              <MenuItem key={option} value={option}>
-                {option}
-              </MenuItem>
-            )
-          )}
+        <Select
+          fullWidth
+          size="small"
+          value={periodicity}
+          onChange={(e) => setPeriodicity(e.target.value)}
+        >
+          {PERIODS.map((p) => (
+            <MenuItem key={p} value={p}>
+              {p}
+            </MenuItem>
+          ))}
         </Select>
       </Grid>
       <Grid item xs={12} sm={6} md={4}>
-        <Select fullWidth defaultValue="Average" size="small">
-          {["Average", "Median", "Mode", "Max", "Min"].map((option) => (
-            <MenuItem key={option} value={option}>
-              {option}
+        <Select
+          fullWidth
+          size="small"
+          value={metric}
+          onChange={(e) => setMetric(e.target.value)}
+        >
+          {METRICS.map((m) => (
+            <MenuItem key={m} value={m}>
+              {m}
             </MenuItem>
           ))}
         </Select>
@@ -174,27 +225,26 @@ function Dashboard() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell></TableCell> {/* Empty cell for alignment */}
-              <TableCell>Date Range 1</TableCell>
-              <TableCell>Date Range 2</TableCell>
+              <TableCell />
+              {tableData.periods.map((p, idx) => (
+                <TableCell key={idx}>{formatDMY(p.end)}</TableCell>
+              ))}
             </TableRow>
           </TableHead>
           <TableBody>
-            <TableRow>
-              <TableCell>
-                <Stack direction="row" spacing={1}>
-                  <Typography variant="subtitle1">Variable 1</Typography>
-                  <Typography variant="caption">Unit</Typography>
-                </Stack>
-              </TableCell>
-              <TableCell>Value 1</TableCell>
-              <TableCell>Value 2</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell></TableCell>
-              <TableCell>Value 3</TableCell>
-              <TableCell>Value 4</TableCell>
-            </TableRow>
+            {tableData.rows.map((row, i) => (
+              <TableRow key={i}>
+                <TableCell>
+                  <Stack direction="row" spacing={1}>
+                    <Typography variant="subtitle1">{row.name}</Typography>
+                    <Typography variant="caption">{row.unit}</Typography>
+                  </Stack>
+                </TableCell>
+                {row.vals.map((val, j) => (
+                  <TableCell key={j}>{val}</TableCell>
+                ))}
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </Grid>
