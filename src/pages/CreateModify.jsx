@@ -15,7 +15,6 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useSnackbar } from "notistack";
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
-import DeleteIcon from "@mui/icons-material/Delete";
 import { storage } from "../utils/storage";
 import { ruleMatches, applyBy } from "../utils/ruleEngine";
 import { format } from "date-fns";
