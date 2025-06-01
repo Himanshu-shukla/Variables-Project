@@ -16,7 +16,7 @@ import { useSnackbar } from "notistack";
 import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { storage } from "../utils/storage";
-import { ruleMatches, applyBy } from "../utils/ruleEngine";
+import { ruleMatches, applyBy, applyByIndependent } from "../utils/ruleEngine";
 import { format } from "date-fns";
 
 const dataTypes = [
@@ -39,7 +39,7 @@ function ChangePanel({ idx, data, onChange, onDelete }) {
   };
 
   return (
-    <Paper variant="outlined" className="p-4 rounded-2xl shadow-sm mb-4">
+    <Paper variant="outlined" className="p-4 rounded  -2xl shadow-sm mb-4">
       <Grid container spacing={2} alignItems="center">
         {/* Row 1 – Checkbox, Start / End date headers */}
         <Grid item xs={12} sm={2} md={1}>
@@ -345,7 +345,7 @@ export default function CreateModify() {
         changeNo: i + 1,
         startDate: format(c.startDate, "dd MMM yy"),
         endDate: format(c.endDate, "dd MMM yy"),
-        every: `${c.betweenValue} ${c.betweenType}`,
+        every: `${c.betweenValue} ${c.between}`,
         by: c.by,
         setTo: c.setTo,
       })),
@@ -372,8 +372,11 @@ export default function CreateModify() {
         ) {
           if (ch.onType === "On Previous Value") {
             currentVal = ch.by ? applyBy(currentVal, ch.by) : Number(ch.setTo);
+          } else if (ch.onType === "Independent") {
+            currentVal = ch.by
+              ? applyByIndependent(r, ch.by)         
+              : Number(ch.setTo);
           } else {
-            // Independent
             currentVal = ch.setTo ? Number(ch.setTo) : applyBy(initVal, ch.by);
           }
         }
@@ -474,7 +477,7 @@ export default function CreateModify() {
                 dataType === "integer"
                   ? !/^\d+$/.test(initialValue) && initialValue !== ""
                   : !/^\d+(\.\d{1,2})?$/.test(initialValue) &&
-                    initialValue !== ""
+                  initialValue !== ""
               }
               helperText={
                 initialValue !== "" &&
@@ -518,7 +521,7 @@ export default function CreateModify() {
               fullWidth
               variant="contained"
               onClick={
-                pageMode !== "change"
+                editMode === true
                   ? handleSubmitChange
                   : handleSubmitVariable
               }
