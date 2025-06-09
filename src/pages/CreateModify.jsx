@@ -172,15 +172,15 @@ export default function CreateModify() {
   const [initialValue, setInitial] = useState("");
 
   const defaultPanel = {
-    enabled: false,
-    startDate: null,
-    endDate: null,
-    between: BETWEEN_TYPE_OPTIONS[0],
-    betweenValue: "",
-    onType: "On Previous Value",
-    by: "",
-    setTo: "",
-  };
+  enabled      : false,
+  startDate    : null,
+  endDate      : null,
+  between      : "Date of Month",
+  betweenValue : "",
+  onType       : "On Previous Value",
+  by           : "",
+  setTo        : "",
+};
 
   const [changes, setChanges] = useState([defaultPanel]);
 
@@ -308,86 +308,48 @@ export default function CreateModify() {
   };
 
   const handleSubmitChange = () => {
-    const fromLS = new Date(localStorage.getItem("fromDate"));
-    const toLS = new Date(localStorage.getItem("toDate"));
+  const fromLS = new Date(localStorage.getItem("fromDate"));
+  const toLS   = new Date(localStorage.getItem("toDate"));
 
-    for (const c of changes) {
-      if (!c.startDate || !c.endDate || !c.betweenValue)
-        return enqueueSnackbar("All Change fields must be filled.", {
-          variant: "error",
-        });
+  for (const c of changes) {
+    if (!c.startDate || !c.endDate || !c.betweenValue)
+      return enqueueSnackbar("All Change fields must be filled.", { variant:"error" });
 
-      if (c.startDate < fromLS || c.endDate > toLS)
-        return enqueueSnackbar(
-          "Start / End must lie inside Dashboard date range.",
-          { variant: "error" }
-        );
+    if (c.startDate < fromLS || c.endDate > toLS)
+      return enqueueSnackbar("Start/End must lie within dashboard range.", { variant:"error" });
 
-      if (c.onType === "On Previous Value" && +c.startDate === +fromLS)
-        return enqueueSnackbar(
-          "Start date must be after overall From date for ‘On Previous Value’.",
-          { variant: "error" }
-        );
+    if (c.onType === "On Previous Value" && +c.startDate === +fromLS)
+      return enqueueSnackbar("Start must be after overall ‘From’ date.", { variant:"error" });
 
-      if (!(c.by || c.setTo))
-        return enqueueSnackbar("Either BY or SET TO must be provided.", {
-          variant: "error",
-        });
-    }
+    if (!(c.by || c.setTo))
+      return enqueueSnackbar("Either BY or SET TO is required.", { variant:"error" });
+  }
 
-    // 2️⃣  persist to variableChanges table ----------------------
-    const varName = name.trim();
-    const prevChanges = storage.getVariableChanges();
-    const nextChanges = [
-      ...prevChanges.filter((r) => r.name !== varName),
-      ...changes.map((c, i) => ({
-        name: varName,
-        changeNo: i + 1,
-        startDate: format(c.startDate, "dd MMM yy"),
-        endDate: format(c.endDate, "dd MMM yy"),
-        every: `${c.betweenValue} ${c.between}`,
-        by: c.by,
-        setTo: c.setTo,
-      })),
-    ];
-    storage.saveVariableChanges(nextChanges);
+  /* 1️⃣  Save to variableChanges ------------------------------ */
+  const varName     = name.trim();
+  const prevChanges = storage.getVariableChanges();
+  const nextChanges = [
+    ...prevChanges.filter((r) => r.name !== varName),
+    ...changes.map((c, i) => ({
+      name        : varName,
+      changeNo    : i + 1,
+      startDate   : format(c.startDate, "dd MMM yy"),
+      endDate     : format(c.endDate,   "dd MMM yy"),
+      every       : `${c.betweenValue} ${c.between}`,
+      between     : c.between,
+      betweenValue: c.betweenValue,
+      onType      : c.onType,
+      by          : c.by,
+      setTo       : c.setTo,
+    })),
+  ];
+  storage.saveVariableChanges(nextChanges);
 
-    // 3️⃣  mutate master table ------------------------------------
-    let rows = storage.getMasterRows(); // already sorted chronologically
-    const initVal = rows.find((r) => r[varName] !== undefined)[varName];
+  /* 2️⃣  Rebuild the column ---------------------------------- */
+  storage.generateMasterTableFromVariableChanges(varName);
 
-    // sort changes by startDate so we walk once
-    const sorted = [...changes].sort((a, b) => a.startDate - b.startDate);
-
-    let currentVal = initVal;
-    rows = rows.map((r) => {
-      const d = new Date(r.date);
-
-      // is this row affected by any change?
-      sorted.forEach((ch) => {
-        if (
-          d >= ch.startDate &&
-          d <= ch.endDate &&
-          ruleMatches(ch, d, ch.startDate)
-        ) {
-          if (ch.onType === "On Previous Value") {
-            currentVal = ch.by ? applyBy(currentVal, ch.by) : Number(ch.setTo);
-          } else if (ch.onType === "Independent") {
-            currentVal = ch.by
-              ? applyByIndependent(r, ch.by)         
-              : Number(ch.setTo);
-          } else {
-            currentVal = ch.setTo ? Number(ch.setTo) : applyBy(initVal, ch.by);
-          }
-        }
-      });
-
-      return { ...r, [varName]: Number(currentVal.toFixed(2)) };
-    });
-
-    storage.saveMasterRows(rows);
-    enqueueSnackbar("Changes applied!", { variant: "success" });
-  };
+  enqueueSnackbar("Changes applied!", { variant:"success" });
+};
 
   // ------------------------- UI ------------------------------
   return (
