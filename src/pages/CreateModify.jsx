@@ -172,15 +172,15 @@ export default function CreateModify() {
   const [initialValue, setInitial] = useState("");
 
   const defaultPanel = {
-  enabled      : false,
-  startDate    : null,
-  endDate      : null,
-  between      : "Date of Month",
-  betweenValue : "",
-  onType       : "On Previous Value",
-  by           : "",
-  setTo        : "",
-};
+    enabled: false,
+    startDate: null,
+    endDate: null,
+    between: "Date of Month",
+    betweenValue: "",
+    onType: "On Previous Value",
+    by: "",
+    setTo: "",
+  };
 
   const [changes, setChanges] = useState([defaultPanel]);
 
@@ -203,8 +203,43 @@ export default function CreateModify() {
   };
 
   const deleteChange = (idx) => {
-    setChanges((prev) => prev.filter((_, i) => i !== idx));
-  };
+    const remaining = changes.filter((c) => !c.enabled);
+
+    if (remaining.length === changes.length) {
+      enqueueSnackbar("Tick the checkbox of the change(s) you want to delete.", {
+        variant: "info",
+      });
+      return;
+    }
+
+    setChanges(remaining);
+
+    const varName = name.trim();
+    const untouched = storage
+      .getVariableChanges()
+      .filter((r) => r.name !== varName);
+
+    const rebuiltForVar = remaining.map((c, i) => ({
+      name: varName,
+      changeNo: i + 1,
+      startDate: format(c.startDate, "dd MMM yy"),
+      endDate: format(c.endDate, "dd MMM yy"),
+      every: `${c.betweenValue} ${c.between}`,
+      between: c.between,
+      betweenValue: c.betweenValue,
+      onType: c.onType,
+      by: c.by,
+      setTo: c.setTo,
+    }));
+
+    storage.saveVariableChanges([...untouched, ...rebuiltForVar]);
+
+    storage.generateMasterTableFromVariableChanges(varName);
+
+    enqueueSnackbar("Selected change(s) deleted.", { variant: "success" });
+
+  }
+
 
   // ---------- if editing, pre‑load the chosen variable -------
   useEffect(() => {
@@ -308,48 +343,48 @@ export default function CreateModify() {
   };
 
   const handleSubmitChange = () => {
-  const fromLS = new Date(localStorage.getItem("fromDate"));
-  const toLS   = new Date(localStorage.getItem("toDate"));
+    const fromLS = new Date(localStorage.getItem("fromDate"));
+    const toLS = new Date(localStorage.getItem("toDate"));
 
-  for (const c of changes) {
-    if (!c.startDate || !c.endDate || !c.betweenValue)
-      return enqueueSnackbar("All Change fields must be filled.", { variant:"error" });
+    for (const c of changes) {
+      if (!c.startDate || !c.endDate || !c.betweenValue)
+        return enqueueSnackbar("All Change fields must be filled.", { variant: "error" });
 
-    if (c.startDate < fromLS || c.endDate > toLS)
-      return enqueueSnackbar("Start/End must lie within dashboard range.", { variant:"error" });
+      if (c.startDate < fromLS || c.endDate > toLS)
+        return enqueueSnackbar("Start/End must lie within dashboard range.", { variant: "error" });
 
-    if (c.onType === "On Previous Value" && +c.startDate === +fromLS)
-      return enqueueSnackbar("Start must be after overall ‘From’ date.", { variant:"error" });
+      if (c.onType === "On Previous Value" && +c.startDate === +fromLS)
+        return enqueueSnackbar("Start must be after overall ‘From’ date.", { variant: "error" });
 
-    if (!(c.by || c.setTo))
-      return enqueueSnackbar("Either BY or SET TO is required.", { variant:"error" });
-  }
+      if (!(c.by || c.setTo))
+        return enqueueSnackbar("Either BY or SET TO is required.", { variant: "error" });
+    }
 
-  /* 1️⃣  Save to variableChanges ------------------------------ */
-  const varName     = name.trim();
-  const prevChanges = storage.getVariableChanges();
-  const nextChanges = [
-    ...prevChanges.filter((r) => r.name !== varName),
-    ...changes.map((c, i) => ({
-      name        : varName,
-      changeNo    : i + 1,
-      startDate   : format(c.startDate, "dd MMM yy"),
-      endDate     : format(c.endDate,   "dd MMM yy"),
-      every       : `${c.betweenValue} ${c.between}`,
-      between     : c.between,
-      betweenValue: c.betweenValue,
-      onType      : c.onType,
-      by          : c.by,
-      setTo       : c.setTo,
-    })),
-  ];
-  storage.saveVariableChanges(nextChanges);
+    /* 1️⃣  Save to variableChanges ------------------------------ */
+    const varName = name.trim();
+    const prevChanges = storage.getVariableChanges();
+    const nextChanges = [
+      ...prevChanges.filter((r) => r.name !== varName),
+      ...changes.map((c, i) => ({
+        name: varName,
+        changeNo: i + 1,
+        startDate: format(c.startDate, "dd MMM yy"),
+        endDate: format(c.endDate, "dd MMM yy"),
+        every: `${c.betweenValue} ${c.between}`,
+        between: c.between,
+        betweenValue: c.betweenValue,
+        onType: c.onType,
+        by: c.by,
+        setTo: c.setTo,
+      })),
+    ];
+    storage.saveVariableChanges(nextChanges);
 
-  /* 2️⃣  Rebuild the column ---------------------------------- */
-  storage.generateMasterTableFromVariableChanges(varName);
+    /* 2️⃣  Rebuild the column ---------------------------------- */
+    storage.generateMasterTableFromVariableChanges(varName);
 
-  enqueueSnackbar("Changes applied!", { variant:"success" });
-};
+    enqueueSnackbar("Changes applied!", { variant: "success" });
+  };
 
   // ------------------------- UI ------------------------------
   return (
