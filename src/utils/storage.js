@@ -94,7 +94,7 @@ export const storage = {
           currentVal =
             ch.onType === "Independent"
               ? (ch.by ? applyByIndependent(row, ch.by) : Number(ch.setTo))
-              : (ch.by ? applyBy(currentVal, ch.by) : Number(ch.setTo));
+              : (ch.by ? applyBy(currentVal, ch.by, row) : Number(ch.setTo));
         }
       });
 
