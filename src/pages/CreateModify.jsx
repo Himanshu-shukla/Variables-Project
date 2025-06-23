@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Box,
   Paper,
   Grid,
   Typography,
   Checkbox,
+  Stack,
   TextField,
   Select,
   MenuItem,
@@ -17,7 +18,7 @@ import { DatePicker, LocalizationProvider } from "@mui/x-date-pickers";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import { storage } from "../utils/storage";
 import { ruleMatches, applyBy, applyByIndependent } from "../utils/ruleEngine";
-import { format } from "date-fns";
+import { format, parse } from "date-fns";
 
 const dataTypes = [
   { label: "Decimal (2 float)", value: "decimal" },
@@ -33,125 +34,149 @@ const BETWEEN_TYPE_OPTIONS = [
   "Number of days (from start date of change date range)",
 ];
 
-function ChangePanel({ idx, data, onChange, onDelete }) {
-  const handleField = (field, value) => {
-    onChange(idx, { ...data, [field]: value });
-  };
+function ChangePanel({ idx, data, onChange }) {
+  const handle = (field, value) => onChange(idx, { ...data, [field]: value });
 
   return (
-    <Paper variant="outlined" className="p-4 rounded  -2xl shadow-sm mb-4">
-      <Grid container spacing={2} alignItems="center">
-        {/* Row 1 – Checkbox, Start / End date headers */}
-        <Grid item xs={12} sm={2} md={1}>
-          <Checkbox
-            checked={data.enabled}
-            onChange={(e) => handleField("enabled", e.target.checked)}
-          />
-        </Grid>
-        <Grid item xs={6} sm={5} md={3}>
-          <Typography variant="subtitle2">Start date</Typography>
-        </Grid>
-        <Grid item xs={6} sm={5} md={3}>
-          <Typography variant="subtitle2">End date</Typography>
-        </Grid>
-        {/* Row 2 – Date pickers */}
-        <Grid item xs={12} sm={2} md={1} /> {/* spacer under checkbox */}
-        <Grid item xs={6} sm={5} md={3}>
-          <LocalizationProvider dateAdapter={AdapterDateFns}>
-            <DatePicker
-              value={data.startDate}
-              onChange={(d) => handleField("startDate", d)}
-              slotProps={{ textField: { size: "small", fullWidth: true } }}
+    <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
+      <Stack direction="column" alignItems="left" spacing={4} sx={{ mb: 1 }}>
+
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+          {/* ─────────── Row 1 : column headers (Start / End) ─────────── */}
+          <Grid item xs={2} >
+            <Checkbox
+              checked={data.enabled}
+              onChange={(e) => handle("enabled", e.target.checked)}
             />
-          </LocalizationProvider>
-        </Grid>
-        <Grid item xs={6} sm={5} md={3}>
-          <LocalizationProvider dateAdapter={AdapterDateFns}>
-            <DatePicker
-              value={data.endDate}
-              onChange={(d) => handleField("endDate", d)}
-              slotProps={{ textField: { size: "small", fullWidth: true } }}
+          </Grid>
+          <Grid item xs={5}>
+            <Typography variant="subtitle2">Start date</Typography>
+          </Grid>
+          <Grid item xs={5}>
+            <Typography variant="subtitle2">End date</Typography>
+          </Grid>
+        </Stack>
+
+
+        {/* ─────────── Row 2 : two pickers ──────────────── */}
+        <Stack direction="row" alignItems="right" justifyContent="space-between" sx={{ mb: 1 }}>
+          <Grid></Grid>
+          <Grid item xs={5}>
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <DatePicker
+                value={data.startDate}
+                onChange={(d) => handle("startDate", d)}
+                slotProps={{ textField: { fullWidth: true, size: "small" } }}
+              />
+            </LocalizationProvider>
+          </Grid>
+          <Grid item xs={5}>
+            <LocalizationProvider dateAdapter={AdapterDateFns}>
+              <DatePicker
+                value={data.endDate}
+                onChange={(d) => handle("endDate", d)}
+                slotProps={{ textField: { fullWidth: true, size: "small" } }}
+              />
+            </LocalizationProvider>
+          </Grid>
+        </Stack>
+
+        {/* ─────────── Row 3 : “Change / Between” labels ───────────── */}
+        <Stack direction="row" alignItems="center" justifyContent="space-between"  sx={{ mb: 1 }}>
+          <Grid item xs={2}>
+            <Typography variant="subtitle2">Change</Typography>
+          </Grid>
+          <Grid item xs={5}>
+            <Typography variant="subtitle2">Between</Typography>
+          </Grid>
+          <Grid item xs={5}>
+            <Select
+              fullWidth
+              size="small"
+              value={data.between}
+              onChange={(e) => handle("between", e.target.value)}
+            >
+              {BETWEEN_TYPE_OPTIONS.map((opt) => (
+                <MenuItem key={opt} value={opt}>
+                  {opt}
+                </MenuItem>
+              ))}
+            </Select>
+          </Grid>
+        </Stack>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
+          <Grid item xs={2}>
+            <Typography variant="subtitle2"></Typography>
+          </Grid>
+          <Grid item xs={5}>
+            <Typography variant="body2">Every</Typography>
+          </Grid>
+          <Grid item xs={5}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Value (e.g. Monday / 1)"
+              value={data.betweenValue}
+              onChange={(e) => handle("betweenValue", e.target.value)}
             />
-          </LocalizationProvider>
-        </Grid>
-        {/* Row 3 – "Change", "Between" labels */}
-        <Grid item xs={12} sm={2} md={1}>
-          <Typography variant="subtitle2">Change</Typography>
-        </Grid>
-        <Grid item xs={6} sm={5} md={3}>
-          <Typography variant="subtitle2">Between</Typography>
-        </Grid>
-        <Grid item xs={6} sm={5} md={3} />
-        {/* Row 4 – "Every" label + Between select */}
-        <Grid item xs={12} sm={2} md={1}>
-          <Typography variant="body2">Every</Typography>
-        </Grid>
-        <Grid item xs={6} sm={5} md={3}>
-          <Select
-            fullWidth
-            size="small"
-            value={data.between}
-            onChange={(e) => handleField("between", e.target.value)}
-          >
-            {BETWEEN_TYPE_OPTIONS.map((opt) => (
-              <MenuItem key={opt} value={opt}>
-                {opt}
-              </MenuItem>
-            ))}
-          </Select>
-        </Grid>
-        <Grid item xs={6} sm={4} md={4}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Enter value (e.g., Monday, 1, 2)"
-            value={data.betweenValue}
-            onChange={(e) => handleField("betweenValue", e.target.value)}
-          />
-        </Grid>
-        <Grid item xs={6} sm={5} md={3} />
-        {/* Row 5 – On Previous Value / By ... dropdown */}
-        <Grid item xs={12} sm={2} md={1}>
-          <Select
-            fullWidth
-            size="small"
-            value={data.onType || "On Previous Value"}
-            onChange={(e) => handleField("onType", e.target.value)}
-          >
-            <MenuItem value="On Previous Value">On Previous Value</MenuItem>
-            <MenuItem value="Independent">Independent</MenuItem>
-          </Select>
-        </Grid>
-        <Grid item xs={6} sm={5} md={3}>
-          <Typography variant="body2">By</Typography>
-        </Grid>
-        <Grid item xs={6} sm={5} md={3}>
-          <TextField
-            fullWidth
-            size="small"
-            value={data.by}
-            onChange={(e) => handleField("by", e.target.value)}
-            placeholder="Enter expression (e.g. +2, *var, IF(,,))"
-          />
-        </Grid>
-        {/* Row 6 – (OR) Set to */}
-        <Grid item xs={12} sm={2} md={1}>
+          </Grid>
+        </Stack>
+        <Grid item xs={5} />
+
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+          <Grid item xs={2}>
+            <Select
+              fullWidth
+              size="small"
+              value={data.onType}
+              onChange={(e) => handle("onType", e.target.value)}
+            >
+              <MenuItem value="On Previous Value">On Previous Value</MenuItem>
+              <MenuItem value="Independent">Independent</MenuItem>
+            </Select>
+          </Grid>
+          <Grid item xs={5}>
+            <Typography variant="body2">By</Typography>
+          </Grid>
+          <Grid item xs={5}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="+5+(A*B)  |  IF(A>2,100,0)"
+              value={data.by}
+              onChange={(e) => handle("by", e.target.value)}
+            />
+          </Grid>
+        </Stack>
+
+        {/* ─────────── Row 6 : (or) + Set-to constant ──────────────── */}
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+          <Grid item xs={4}>
+            <Typography variant="caption">(or)</Typography>
+          </Grid>
+          <Grid item xs={5}>
+            <Typography variant="body2">Set to</Typography>
+          </Grid>
+          <Grid item xs={5}>
+            <TextField
+              fullWidth
+              size="small"
+              value={data.setTo}
+              onChange={(e) => handle("setTo", e.target.value)}
+            />
+          </Grid>
+        </Stack>
+
+        {/* ─────────── Row 7 : helper line spans across right columns ─*/}
+        <Grid item xs={2} />
+        <Grid item xs={10}>
           <Typography variant="caption" color="text.secondary">
-            (OR)
+            Accepted characters for “By”: numbers, variable names, common
+            operators (+ − * / ^), uncommon functions (Rem, Trunc, Round, ABS,
+            Roundup, Rounddown), logical operators (AND, OR, NOT) and IF(,,).
           </Typography>
         </Grid>
-        <Grid item xs={6} sm={5} md={3}>
-          <Typography variant="body2">Set to</Typography>
-        </Grid>
-        <Grid item xs={6} sm={5} md={3}>
-          <TextField
-            fullWidth
-            size="small"
-            value={data.setTo}
-            onChange={(e) => handleField("setTo", e.target.value)}
-          />
-        </Grid>
-      </Grid>
+      </Stack>
     </Paper>
   );
 }
@@ -171,56 +196,86 @@ export default function CreateModify() {
   const [unit, setUnit] = useState("");
   const [initialValue, setInitial] = useState("");
 
-  const defaultPanel = {
+  const blankPanel = {
     enabled: false,
     startDate: null,
     endDate: null,
-    between: "Date of Month",
+    between: BETWEEN_TYPE_OPTIONS[0],
     betweenValue: "",
     onType: "On Previous Value",
     by: "",
     setTo: "",
   };
 
-  const [changes, setChanges] = useState([defaultPanel]);
+  const [changes, setChanges] = useState(editMode ? [] : [blankPanel]);
 
-  const updateChange = (idx, patch) => {
-    setChanges((prev) => prev.map((c, i) => (i === idx ? patch : c)));
-  };
+  const updateChange = useCallback(
+    (idx, patch) => setChanges((prev) => prev.map((c, i) => (i === idx ? patch : c))),
+    []
+  );
 
-  const addChange = () => {
-    setChanges((prev) => [
-      ...prev,
-      {
-        enabled: false,
-        startDate: null,
-        endDate: null,
-        between: BETWEEN_TYPE_OPTIONS[0],
-        by: "",
-        setTo: "",
-      },
-    ]);
-  };
+  const addChange = () => setChanges((prev) => [...prev, { ...blankPanel }]);
 
-  const deleteChange = (idx) => {
+  useEffect(() => {
+    if (!editMode) return;
+
+    const vars = storage.getVariables();
+    const v = vars[editIdx];
+
+    if (!v) {
+      enqueueSnackbar("Variable not found.", { variant: "error" });
+      navigate("/variables");
+      return;
+    }
+    setName(v.name);
+    setDataType(v.datatype);
+    setUnit(v.unit);
+    setInitial(v.initial);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /*────────────── 2.  Load prior *changes* for that variable ───────*/
+  useEffect(() => {
+    if (!editMode || !name) return;              // wait until meta loaded
+
+    const raw = storage.getVariableChanges()
+      .filter((c) => c.name === name)
+      .sort(
+        (a, b) =>
+          parse(a.startDate, "dd MMM yy", new Date()) -
+          parse(b.startDate, "dd MMM yy", new Date())
+      );
+
+    if (!raw.length) {
+      setChanges([blankPanel]);
+      return;
+    }
+
+    const panels = raw.map((c) => ({
+      enabled: false, // unchecked by default
+      startDate: parse(c.startDate, "dd MMM yy", new Date()),
+      endDate: parse(c.endDate, "dd MMM yy", new Date()),
+      between: c.between,
+      betweenValue: c.betweenValue,
+      onType: c.onType || "On Previous Value",
+      by: c.by,
+      setTo: c.setTo,
+    }));
+    setChanges(panels);
+  }, [editMode, name]);
+
+  const deleteChange = () => {
     const remaining = changes.filter((c) => !c.enabled);
-
     if (remaining.length === changes.length) {
-      enqueueSnackbar("Tick the checkbox of the change(s) you want to delete.", {
+      enqueueSnackbar("Tick the change(s) you want to delete.", {
         variant: "info",
       });
       return;
     }
-
     setChanges(remaining);
 
-    const varName = name.trim();
-    const untouched = storage
-      .getVariableChanges()
-      .filter((r) => r.name !== varName);
-
-    const rebuiltForVar = remaining.map((c, i) => ({
-      name: varName,
+    const rebuild = remaining.map((c, i) => ({
+      name,
       changeNo: i + 1,
       startDate: format(c.startDate, "dd MMM yy"),
       endDate: format(c.endDate, "dd MMM yy"),
@@ -232,13 +287,14 @@ export default function CreateModify() {
       setTo: c.setTo,
     }));
 
-    storage.saveVariableChanges([...untouched, ...rebuiltForVar]);
-
-    storage.generateMasterTableFromVariableChanges(varName);
+    const untouched = storage
+      .getVariableChanges()
+      .filter((r) => r.name !== name);
+    storage.saveVariableChanges([...untouched, ...rebuild]);
+    storage.generateMasterTableFromVariableChanges(name);
 
     enqueueSnackbar("Selected change(s) deleted.", { variant: "success" });
-
-  }
+  };
 
 
   // ---------- if editing, pre‑load the chosen variable -------
@@ -390,101 +446,78 @@ export default function CreateModify() {
   return (
     <Grid container spacing={2} sx={{ p: 2 }}>
       {/* name */}
-      <Grid item xs={12} sm={6}>
-        <Grid container alignItems="center" spacing={2}>
-          <Grid item xs={4}>
-            <Typography>Name</Typography>
-          </Grid>
-          <Grid item xs={8}>
-            <TextField
-              fullWidth
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              inputProps={{ maxLength: 15 }}
-            />
-          </Grid>
-        </Grid>
-      </Grid>
-      {/* datatype */}
-      <Grid item xs={12} sm={6}>
-        <Grid container alignItems="center" spacing={2}>
-          <Grid item xs={4}>
-            <Typography>DataType</Typography>
-          </Grid>
-          <Grid item xs={8}>
-            <TextField
-              select
-              fullWidth
-              required
-              value={dataType}
-              onChange={(e) => setDataType(e.target.value)}
-            >
-              {dataTypes.map((d) => (
-                <MenuItem key={d.value} value={d.value}>
-                  {d.label}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-        </Grid>
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <Grid container alignItems="center" spacing={2}>
-          <Grid item xs={4}>
-            <Typography>Unit</Typography>
-          </Grid>
-          <Grid item xs={8}>
-            <TextField
-              fullWidth
-              required
-              value={unit}
-              onChange={(e) => setUnit(e.target.value)}
-              slotProps={{ input: { maxLength: 3 } }}
-            />
-          </Grid>
-        </Grid>
-      </Grid>
-      <Grid item xs={12} sm={6}>
-        <Grid container alignItems="center" spacing={2}>
-          <Grid item xs={4}>
-            <Typography>Initial Value</Typography>
-          </Grid>
-          <Grid item xs={8}>
-            <TextField
-              fullWidth
-              required
-              value={initialValue}
-              onChange={(e) => {
-                const val = e.target.value;
+      <Grid item xs={12}>
+        {/*          🡇  one on top of another  🡇 */}
+        <Stack spacing={2} sx={{ minWidth: 420 }}>
+          {/* Name */}
+          <TextField
+            label="Name"
+            fullWidth
+            value={name}
+            inputProps={{ maxLength: 15 }}
+            onChange={(e) => setName(e.target.value)}
+            disabled={editMode /* not editable after creation */}
+          />
 
-                // live filtering based on datatype
-                if (dataType === "integer") {
-                  if (/^\d*$/.test(val)) setInitial(val); // allow only digits
-                } else {
-                  if (/^\d*\.?\d{0,2}$/.test(val)) setInitial(val); // up to 2 decimals
-                }
-              }}
-              slotProps={{
-                input: {
-                  inputMode: "decimal",
-                  step: dataType === "integer" ? "1" : "0.01",
-                },
-              }}
-              error={
-                dataType === "integer"
-                  ? !/^\d+$/.test(initialValue) && initialValue !== ""
-                  : !/^\d+(\.\d{1,2})?$/.test(initialValue) &&
-                  initialValue !== ""
+          {/* Datatype */}
+          <TextField
+            label="Datatype"
+            select
+            fullWidth
+            required
+            value={dataType}
+            onChange={(e) => setDataType(e.target.value)}
+            disabled={editMode}
+          >
+            {dataTypes.map((d) => (
+              <MenuItem key={d.value} value={d.value}>
+                {d.label}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          {/* Unit */}
+          <TextField
+            label="Unit"
+            fullWidth
+            required
+            value={unit}
+            inputProps={{ maxLength: 3 }}
+            onChange={(e) => setUnit(e.target.value)}
+            disabled={editMode}
+          />
+
+          {/* Initial value */}
+          <TextField
+            label="Initial value"
+            fullWidth
+            required
+            value={initialValue}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (dataType === "integer") {
+                if (/^\d*$/.test(val)) setInitial(val);
+              } else {
+                if (/^\d*\.?\d{0,2}$/.test(val)) setInitial(val);
               }
-              helperText={
-                initialValue !== "" &&
-                (dataType === "integer"
-                  ? "Must be a whole number"
-                  : "Up to 2 decimal places")
-              }
-            />
-          </Grid>
-        </Grid>
+            }}
+            inputProps={{
+              inputMode: "decimal",
+              step: dataType === "integer" ? "1" : "0.01",
+            }}
+            error={
+              dataType === "integer"
+                ? !/^\d+$/.test(initialValue) && initialValue !== ""
+                : !/^\d+(\.\d{1,2})?$/.test(initialValue) && initialValue !== ""
+            }
+            helperText={
+              initialValue !== "" &&
+              (dataType === "integer"
+                ? "Must be a whole number"
+                : "Up to 2 decimal places")
+            }
+          />
+        </Stack>
       </Grid>
       <Box className="p-4 space-y-4">
         {changes.map((panel, idx) => (
