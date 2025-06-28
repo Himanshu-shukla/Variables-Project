@@ -27,9 +27,9 @@ const dataTypes = [
 ];
 
 const BETWEEN_TYPE_OPTIONS = [
-  "Date of Month",
-  "Date of Quarter",
-  "Date of Year",
+  "Day of Month",
+  "Day of Quarter",
+  "Day of Year",
   "Day of Week",
   "Number of days (from start date of change date range)",
 ];

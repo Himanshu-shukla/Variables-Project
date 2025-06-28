@@ -7,7 +7,10 @@ import {
   TableRow,
   TableCell,
   Checkbox,
+  Paper,
+  TableContainer,
   Button,
+  Stack,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useSnackbar } from "notistack";
@@ -49,7 +52,7 @@ export default function Variables() {
   const handleModify = () => {
     if (!variables.length) return;
     navigate("/create-modify", {
-      state: { pageMode: "variable", mode: "edit", editIdx : selectedIdx },
+      state: { pageMode: "variable", mode: "edit", editIdx: selectedIdx },
     });
   };
 
@@ -72,47 +75,52 @@ export default function Variables() {
 
   // ---------------------------------------------------------------------
   return (
-    <Grid container spacing={2} sx={{ p: 2 }}>
+    <Stack direction="column" justifyContent="space-around" spacing={2} ml={2}> 
+      {/* Table Section */}
       <Grid item xs={12}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Unit</TableCell>
-              <TableCell>Min</TableCell>
-              <TableCell>Max</TableCell>
-              <TableCell>Select</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {variables.map((v, i) => (
-              <TableRow key={i}>
-                <TableCell>{v.name}</TableCell>
-                <TableCell>{v.unit}</TableCell>
-                <TableCell>{v.min ?? "-"}</TableCell>
-                <TableCell>{v.max ?? "-"}</TableCell>
-                <TableCell>
-                  <Checkbox
-                    checked={selectedIdx === i}
-                    onChange={() => handleSelect(i)}
-                  />
-                </TableCell>
-              </TableRow>
-            ))}
-            {!variables.length && (
-              <TableRow>
-                <TableCell colSpan={5} align="center">
-                  No variables found.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
+        <Paper elevation={3} sx={{ borderRadius: 2 }}>
+          <TableContainer sx={{ maxHeight: 400, overflowX: 'auto' }}>
+            <Table size="small" aria-label="variables table">
+              <TableHead>
+                <TableRow>
+                  <TableCell>Name</TableCell>
+                  <TableCell>Unit</TableCell>
+                  <TableCell>Min</TableCell>
+                  <TableCell>Max</TableCell>
+                  <TableCell>Select</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {variables.map((v, i) => (
+                  <TableRow key={i}>
+                    <TableCell>{v.name}</TableCell>
+                    <TableCell>{v.unit}</TableCell>
+                    <TableCell>{v.min ?? '-'}</TableCell>
+                    <TableCell>{v.max ?? '-'}</TableCell>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIdx === i}
+                        onChange={() => handleSelect(i)}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!variables.length && (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center">
+                      No variables found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
       </Grid>
 
-      {/* buttons */}
-      <Grid item xs={12}>
-        <Grid container spacing={2}>
+      {/* Buttons Below Table, In a Row, Responsive */}
+      <Stack direction="row" >
+        <Grid container spacing={2} wrap="wrap" alignItems="center">
           <Grid item>
             <Button variant="contained" onClick={handleCreate}>
               Create
@@ -137,12 +145,12 @@ export default function Variables() {
             </Button>
           </Grid>
           <Grid item>
-            <Button variant="contained" onClick={() => navigate("/")}>
+            <Button variant="contained" onClick={() => navigate('/')}>
               Back
             </Button>
           </Grid>
         </Grid>
-      </Grid>
-    </Grid>
+      </Stack>
+    </Stack>
   );
 }

@@ -9,7 +9,9 @@ import {
   TableHead,
   Stack,
   TableRow,
+  Paper,
   TableCell,
+  TableContainer,
   TableBody,
   Typography,
   useMediaQuery,
@@ -22,13 +24,44 @@ import { useSnackbar } from "notistack";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
-
+import MetricTable from "../components/MetricTable"
 import { storage } from "../utils/storage";
 import { splitIntoPeriods, formatDMY } from "../utils/dateMath";
 import { calcMetric } from "../utils/metrics";
 
 const PERIODS = ["Daily", "Weekly", "Monthly", "Quarterly", "Annual"];
 const METRICS = ["Average", "Median", "Mode", "Max", "Min"];
+
+
+const ClearLocalStorageButton = () => {
+  const theme = useTheme();
+  const isSmall = useMediaQuery(theme.breakpoints.down('sm'));
+
+  const handleClearLocalStorage = () => {
+    // Clear all data from localStorage
+    localStorage.clear();
+    alert("Local storage has been cleared!");
+  };
+
+  return (
+    <Grid item xs={12} sx={{ textAlign: 'center', marginBottom: 2 }}>
+      <Button
+        sx={{
+          position: 'absolute',
+          top: 16,
+          right: 16,
+          zIndex: 10,
+        }}
+        variant="outlined"
+        size={isSmall ? "small" : "medium"}
+        color="error"
+        onClick={handleClearLocalStorage}
+      >
+        Start Fresh
+      </Button>
+    </Grid>
+  );
+};
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -128,156 +161,152 @@ export default function Dashboard() {
 
   /* ── render ────────────────────────────────────────── */
   return (
-    <Grid container spacing={2} sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
-      {/* Date pickers + submit */}
-      <Grid item xs={12}>
-        <Grid container spacing={2} alignItems="center" wrap="wrap">
-          <Grid item xs={12} sm="auto">
-            <Typography variant={isSmall ? "body1" : "h6"}>
-              Date Range
-            </Typography>
-          </Grid>
+    <>
+      <ClearLocalStorageButton />
+      <Grid container spacing={2} sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
 
-          <Grid item xs={12} sm={4} md={2}>
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <DatePicker
-                label="From"
-                value={fromDate}
-                disabled={isSubmitted}
-                onChange={setFromDate}
-                slotProps={{ textField: { fullWidth: true, size: "small" } }}
-              />
-            </LocalizationProvider>
-          </Grid>
+        {/* First Row: Date pickers + Submit + Variables */}
+        <Grid item xs={12}>
+          <Grid container spacing={2} alignItems="center" wrap="wrap">
+            <Grid item xs={12} sm="auto">
+              <Typography variant={isSmall ? "body1" : "h6"}>Date Range</Typography>
+            </Grid>
 
-          <Grid item xs={12} sm={4} md={2}>
-            <LocalizationProvider dateAdapter={AdapterDateFns}>
-              <DatePicker
-                label="To"
-                value={toDate}
-                disabled={isSubmitted}
-                onChange={setToDate}
-                slotProps={{ textField: { fullWidth: true, size: "small" } }}
-              />
-            </LocalizationProvider>
-          </Grid>
+            <Grid item xs={12} sm={4} md={2}>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <DatePicker
+                  label="From"
+                  value={fromDate}
+                  disabled={isSubmitted}
+                  onChange={setFromDate}
+                  slotProps={{ textField: { fullWidth: true, size: "small" } }}
+                />
+              </LocalizationProvider>
+            </Grid>
 
-          <Grid item xs={12} sm="auto">
-            <Button
-              variant="contained"
-              size={isSmall ? "small" : "medium"}
-              onClick={handleSubmit}
-            >
-              Submit
-            </Button>
+            <Grid item xs={12} sm={4} md={2}>
+              <LocalizationProvider dateAdapter={AdapterDateFns}>
+                <DatePicker
+                  label="To"
+                  value={toDate}
+                  disabled={isSubmitted}
+                  onChange={setToDate}
+                  slotProps={{ textField: { fullWidth: true, size: "small" } }}
+                />
+              </LocalizationProvider>
+            </Grid>
+
+            <Grid item xs={12} sm="auto">
+              <Button
+                variant="contained"
+                size={isSmall ? "small" : "medium"}
+                onClick={handleSubmit}
+              >
+                Submit
+              </Button>
+            </Grid>
+
+            {isSubmitted && (
+              <Grid item xs={12} sm="auto">
+                <Button
+                  variant="contained"
+                  size={isSmall ? "small" : "medium"}
+                  fullWidth={isSmall}
+                  onClick={() => navigate("/variables")}
+                >
+                  Variables
+                </Button>
+              </Grid>
+            )}
           </Grid>
         </Grid>
-      </Grid>
 
-      {/* Everything else is hidden until submitted */}
-      {isSubmitted && (
-        <>
-          {/* Variables button (optional) */}
+        {/* Second Row: Dropdowns */}
+        {isSubmitted && (
           <Grid item xs={12}>
-            <Button
-              variant="contained"
-              size={isSmall ? "small" : "medium"}
-              fullWidth={isSmall}
-              onClick={() => navigate("/variables")}
-            >
-              Variables
-            </Button>
-          </Grid>
-
-          {/* Include dropdown */}
-          <Grid item xs={12} sm={6} md={4} lg={3}>
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography variant="subtitle1">Include</Typography>
-              <Select
-                size="small"
-                fullWidth
-                displayEmpty
-                value={selectedIdx}
-                onChange={(e) => {
-                  setSelectedIdx(e.target.value);
-                  localStorage.setItem(
-                    "selectedVariableIndex",
-                    e.target.value
-                  );
-                }}
-              >
-                <MenuItem value="">
-                  <em>Select variable…</em>
-                </MenuItem>
-                {variables.map((v, i) => (
-                  <MenuItem key={i} value={i}>
-                    {v.name}
-                  </MenuItem>
-                ))}
-              </Select>
-            </Stack>
-          </Grid>
-
-          {/* Periodicity + Metric dropdowns */}
-          <Grid item xs={12} sm={6} md={4}>
-            <Select
-              size="small"
-              fullWidth
-              value={periodicity}
-              onChange={(e) => setPeriodicity(e.target.value)}
-            >
-              {PERIODS.map((p) => (
-                <MenuItem key={p} value={p}>
-                  {p}
-                </MenuItem>
-              ))}
-            </Select>
-          </Grid>
-          <Grid item xs={12} sm={6} md={4}>
-            <Select
-              size="small"
-              fullWidth
-              value={metric}
-              onChange={(e) => setMetric(e.target.value)}
-            >
-              {METRICS.map((m) => (
-                <MenuItem key={m} value={m}>
-                  {m}
-                </MenuItem>
-              ))}
-            </Select>
-          </Grid>
-
-          {/* Summary table */}
-          <Grid item xs={12}>
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell />
-                  {tableData.periods.map((p, i) => (
-                    <TableCell key={i}>{formatDMY(p.end)}</TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {tableData.rows.map((row, i) => (
-                  <TableRow key={i}>
-                    <TableCell>
-                      <Stack direction="row" spacing={1}>
-                        <Typography variant="subtitle1">{row.name}</Typography>
-                        <Typography variant="subtitle1">{row.unit}</Typography>
-                      </Stack>
-                    </TableCell>
-                    {row.vals.map((v, j) => (
-                      <TableCell key={j}>{v}</TableCell>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6} md={4} lg={3}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Typography variant="subtitle1">Include</Typography>
+                  <Select
+                    size="small"
+                    fullWidth
+                    displayEmpty
+                    value={selectedIdx}
+                    onChange={(e) => {
+                      setSelectedIdx(e.target.value);
+                      localStorage.setItem("selectedVariableIndex", e.target.value);
+                    }}
+                  >
+                    <MenuItem value="">
+                      <em>Select variable…</em>
+                    </MenuItem>
+                    {variables.map((v, i) => (
+                      <MenuItem key={i} value={i}>
+                        {v.name}
+                      </MenuItem>
                     ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </Grid>
+                  </Select>
+                </Stack>
+              </Grid>
 
-          {/* Download */}
+              <Grid item xs={12} sm={6} md={4}>
+                <Select
+                  size="small"
+                  fullWidth
+                  value={periodicity}
+                  onChange={(e) => setPeriodicity(e.target.value)}
+                >
+                  {PERIODS.map((p) => (
+                    <MenuItem key={p} value={p}>
+                      {p}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Grid>
+
+              <Grid item xs={12} sm={6} md={4}>
+                <Select
+                  size="small"
+                  fullWidth
+                  value={metric}
+                  onChange={(e) => setMetric(e.target.value)}
+                >
+                  {METRICS.map((m) => (
+                    <MenuItem key={m} value={m}>
+                      {m}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Grid>
+            </Grid>
+          </Grid>
+        )}
+
+        {/* Third Row: Table */}
+        {isSubmitted && (
+          <Grid item xs={12}>
+            <TableContainer
+              component={Paper}
+              elevation={3}
+              sx={{
+                width: '100%',
+                overflowX: 'auto',
+                borderRadius: 2,
+                '&::-webkit-scrollbar': { height: 8 },
+                '&::-webkit-scrollbar-thumb': {
+                  backgroundColor: theme.palette.primary.main,
+                  borderRadius: 2,
+                },
+              }}
+            >
+              <MetricTable tableData={tableData} formatDMY={formatDMY} />
+            </TableContainer>
+          </Grid>
+        )}
+
+        {/* Fourth Row: Download Button */}
+        {isSubmitted && (
           <Grid item xs={12} sx={{ textAlign: { xs: "center", sm: "right" } }}>
             <Button
               variant="contained"
@@ -287,8 +316,9 @@ export default function Dashboard() {
               Download
             </Button>
           </Grid>
-        </>
-      )}
-    </Grid>
+        )}
+      </Grid>
+    </>
+
   );
 }
