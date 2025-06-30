@@ -82,7 +82,7 @@ function ChangePanel({ idx, data, onChange }) {
         </Stack>
 
         {/* ─────────── Row 3 : “Change / Between” labels ───────────── */}
-        <Stack direction="row" alignItems="center" justifyContent="space-between"  sx={{ mb: 1 }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
           <Grid item xs={2}>
             <Typography variant="subtitle2">Change</Typography>
           </Grid>
@@ -180,6 +180,15 @@ function ChangePanel({ idx, data, onChange }) {
     </Paper>
   );
 }
+
+
+const isRealChange = (panels) =>
+  panels.some(
+    (c) =>
+      c.betweenValue &&                   // “Every …” filled
+      (c.by || c.setTo) &&                // at least BY or SET-TO
+      c.startDate && c.endDate            // both dates picked
+  );
 
 export default function CreateModify() {
   const navigate = useNavigate();
@@ -315,42 +324,30 @@ export default function CreateModify() {
   }, []);
 
   // ------------------------- submit --------------------------
-  const handleSubmitVariable = () => {
+ 
+  const createOrUpdateVariable = () => {
     if (!name.trim() || !dataType || !unit.trim() || initialValue === "") {
       enqueueSnackbar("All fields are required.", { variant: "error" });
-      return;
+      return false;
     }
 
     if (name.length > 15 || unit.length > 3) {
-      enqueueSnackbar("Name ≤ 15 chars, Unit ≤ 3 chars", {
-        variant: "warning",
-      });
-      return;
+      enqueueSnackbar("Name ≤ 15 chars, Unit ≤ 3 chars", { variant: "warning" });
+      return false;
     }
 
     const parsedInit =
-      dataType === "integer"
-        ? parseInt(initialValue)
-        : parseFloat(initialValue);
+      dataType === "integer" ? parseInt(initialValue) : parseFloat(initialValue);
 
-    const newVar = {
-      name,
-      datatype: dataType,
-      unit,
-      initial: parsedInit,
-      min: parsedInit,
-      max: parsedInit,
-    };
-
+    const newVar = { name, datatype: dataType, unit, initial: parsedInit, min: parsedInit, max: parsedInit };
     const vars = storage.getVariables();
 
-    // duplicate-name check (ignore current row in edit mode)
     const duplicate = vars.some(
       (v, idx) => v.name === name && idx !== (editIdx ?? -1)
     );
     if (duplicate) {
       enqueueSnackbar("Name must be unique", { variant: "error" });
-      return;
+      return false;
     }
 
     let updatedVars;
@@ -361,11 +358,8 @@ export default function CreateModify() {
       localStorage.setItem("selectedVariableIndex", editIdx);
       enqueueSnackbar("Variable updated", { variant: "success" });
 
-      // --- column rename if name changed ----------------------
       if (oldVar.name !== name) {
         storage.renameColumnInMaster(oldVar.name, name);
-
-        // also rename in variableChanges
         const changes = storage.getVariableChanges();
         const patched = changes.map((c) =>
           c.variableName === oldVar.name ? { ...c, variableName: name } : c
@@ -373,50 +367,67 @@ export default function CreateModify() {
         storage.saveVariableChanges(patched);
       }
 
-      // --- initial value change: patch rows before first change
       if (oldVar.initial !== parsedInit) {
         const firstChange = storage
           .getVariableChanges()
           .filter((c) => c.variableName === name)
           .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))[0];
-
         const cutOffISO = firstChange
           ? firstChange.startDate
           : localStorage.getItem("toDate");
         storage.patchInitialValues(name, parsedInit, cutOffISO);
       }
     } else {
-      // ---------- CREATE mode ---------------------------------
       updatedVars = [...vars, newVar];
       localStorage.setItem("selectedVariableIndex", updatedVars.length - 1);
       enqueueSnackbar("Variable created", { variant: "success" });
-
       storage.addColumnToMaster({ name, initial: parsedInit });
     }
 
     storage.saveVariables(updatedVars);
-    navigate("/variables");
+    return true;
   };
 
-  const handleSubmitChange = () => {
+    const handleSubmit = () => {
+    if (editMode) {
+      if (saveChanges()) navigate("/variables");
+    } else {
+      const created = createOrUpdateVariable();
+      if (!created) return;
+      if (isRealChange(changes)) {
+        const applied = saveChanges();
+        if (!applied) return;
+      }
+      navigate("/variables");
+    }
+  };
+
+  const saveChanges = () => {
     const fromLS = new Date(localStorage.getItem("fromDate"));
     const toLS = new Date(localStorage.getItem("toDate"));
 
     for (const c of changes) {
-      if (!c.startDate || !c.endDate || !c.betweenValue)
-        return enqueueSnackbar("All Change fields must be filled.", { variant: "error" });
+      if (!c.startDate || !c.endDate || !c.betweenValue) {
+        enqueueSnackbar("All Change fields must be filled.", { variant: "error" });
+        return false;
+      }
 
-      if (c.startDate < fromLS || c.endDate > toLS)
-        return enqueueSnackbar("Start/End must lie within dashboard range.", { variant: "error" });
+      if (c.startDate < fromLS || c.endDate > toLS) {
+        enqueueSnackbar("Start/End must lie within dashboard range.", { variant: "error" });
+        return false;
+      }
 
-      if (c.onType === "On Previous Value" && +c.startDate === +fromLS)
-        return enqueueSnackbar("Start must be after overall ‘From’ date.", { variant: "error" });
+      if (c.onType === "On Previous Value" && +c.startDate === +fromLS) {
+        enqueueSnackbar("Start must be after overall ‘From’ date.", { variant: "error" });
+        return false;
+      }
 
-      if (!(c.by || c.setTo))
-        return enqueueSnackbar("Either BY or SET TO is required.", { variant: "error" });
+      if (!(c.by || c.setTo)) {
+        enqueueSnackbar("Either BY or SET TO is required.", { variant: "error" });
+        return false;
+      }
     }
 
-    /* 1️⃣  Save to variableChanges ------------------------------ */
     const varName = name.trim();
     const prevChanges = storage.getVariableChanges();
     const nextChanges = [
@@ -435,12 +446,11 @@ export default function CreateModify() {
       })),
     ];
     storage.saveVariableChanges(nextChanges);
-
-    /* 2️⃣  Rebuild the column ---------------------------------- */
     storage.generateMasterTableFromVariableChanges(varName);
-
     enqueueSnackbar("Changes applied!", { variant: "success" });
+    return true;
   };
+
 
   // ------------------------- UI ------------------------------
   return (
@@ -551,9 +561,7 @@ export default function CreateModify() {
               fullWidth
               variant="contained"
               onClick={
-                editMode === true
-                  ? handleSubmitChange
-                  : handleSubmitVariable
+                handleSubmit
               }
             >
               Submit

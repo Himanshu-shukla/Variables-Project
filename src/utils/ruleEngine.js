@@ -17,16 +17,16 @@ export function ruleMatches({ between, betweenValue }, rowDate, changeStart) {
         betweenValue
       );
 
-    case "Date of Month":
+    case "Day of Month":
       return rowDate.getDate() === Number(betweenValue);
 
-    case "Date of Quarter": {
+    case "Day of Quarter": {
       const diff =
         differenceInCalendarDays(rowDate, startOfQuarter(rowDate)) + 1;
       return diff === Number(betweenValue);
     }
 
-    case "Date of Year": {
+    case "Day of Year": {
       const diff = differenceInCalendarDays(rowDate, startOfYear(rowDate)) + 1;
       return diff === Number(betweenValue);
     }

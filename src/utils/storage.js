@@ -9,9 +9,9 @@ import {
 import { parse } from "date-fns";
 
 // ---------- keys ---------------------------------------------
-const VAR_KEY         = "variables";
+const VAR_KEY = "variables";
 const VAR_CHANGES_KEY = "variableChanges";
-const MASTER_KEY      = "masterTable";
+const MASTER_KEY = "masterTable";
 
 // ---------- helpers ------------------------------------------
 const get = (k, fb) => {
@@ -24,16 +24,16 @@ const set = (k, v) => localStorage.setItem(k, JSON.stringify(v));
 // ---------- public API ---------------------------------------
 export const storage = {
   /* 1️⃣  VARIABLES ------------------------------------------- */
-  getVariables        : ()      => get(VAR_KEY, []),
-  saveVariables       : (vars)  => set(VAR_KEY, vars),
+  getVariables: () => get(VAR_KEY, []),
+  saveVariables: (vars) => set(VAR_KEY, vars),
 
   /* 2️⃣  VARIABLE-CHANGES ------------------------------------ */
-  getVariableChanges  : ()      => get(VAR_CHANGES_KEY, []),
-  saveVariableChanges : (arr)   => set(VAR_CHANGES_KEY, arr),
+  getVariableChanges: () => get(VAR_CHANGES_KEY, []),
+  saveVariableChanges: (arr) => set(VAR_CHANGES_KEY, arr),
 
   /* 3️⃣  MASTER TABLE ---------------------------------------- */
-  getMasterRows       : ()      => get(MASTER_KEY, []),
-  saveMasterRows      : (rows)  => set(MASTER_KEY, rows),
+  getMasterRows: () => get(MASTER_KEY, []),
+  saveMasterRows: (rows) => set(MASTER_KEY, rows),
 
   addColumnToMaster({ name, initial }) {
     let rows = this.getMasterRows();
@@ -102,23 +102,43 @@ export const storage = {
     });
 
     this.saveMasterRows(patched);
+
+
+    /* ─── 1️⃣  Re-compute min / max for this variable ─── */
+    const colValues = patched
+      .map(r => r[variableName])
+      .filter(v => typeof v === "number" && !isNaN(v));
+
+    if (colValues.length) {
+      const newMin = Math.min(...colValues);
+      const newMax = Math.max(...colValues);
+
+      /* ─── 2️⃣  Patch the variable record and persist ─── */
+      const vars = this.getVariables();
+      const idx = vars.findIndex(v => v.name === variableName);
+      if (idx !== -1) {
+        vars[idx] = { ...vars[idx], min: newMin, max: newMax };
+        this.saveVariables(vars);
+      }
+    }
+
   },
 
   /* ---------- private --------------------------------------- */
   _bootstrapSkeleton() {
     const fromISO = localStorage.getItem("fromDate");
-    const toISO   = localStorage.getItem("toDate");
+    const toISO = localStorage.getItem("toDate");
     if (!(fromISO && toISO)) return [];
 
     const start = new Date(fromISO);
-    const end   = new Date(toISO);
-    const rows  = [];
+    const end = new Date(toISO);
+    const rows = [];
 
     for (let i = 1, cur = new Date(start); cur <= end; i++, cur.setDate(cur.getDate() + 1)) {
       rows.push({
-        sno : i,
-        date: cur.toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"2-digit" }),
-        dow : cur.toLocaleDateString("en-GB", { weekday:"short" }),
+        sno: i,
+        date: cur.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "2-digit" }),
+        dow: cur.toLocaleDateString("en-GB", { weekday: "short" }),
       });
     }
     return rows;

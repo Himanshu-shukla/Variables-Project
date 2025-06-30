@@ -40,7 +40,7 @@ const ClearLocalStorageButton = () => {
   const handleClearLocalStorage = () => {
     // Clear all data from localStorage
     localStorage.clear();
-    alert("Local storage has been cleared!");
+    window.location.reload();
   };
 
   return (
@@ -79,7 +79,7 @@ export default function Dashboard() {
   const [metric, setMetric] = useState("Average");
 
   const [variables, setVariables] = useState([]);
-  const [selectedIdx, setSelectedIdx] = useState("");
+  const [selectedIdx, setSelectedIdx] = useState([]);
 
   /* ── initialise variables list ─────────────────────── */
   useEffect(() => {
@@ -98,8 +98,16 @@ export default function Dashboard() {
   /* ── once vars load, restore chosen variable ───────── */
   useEffect(() => {
     if (!variables.length) return;
-    const idx = localStorage.getItem("selectedVariableIndex");
-    if (idx !== null) setSelectedIdx(idx);
+    try {
+      const saved = localStorage.getItem("selectedVariableIndex");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        setSelectedIdx(Array.isArray(parsed) ? parsed : []);
+      }
+    } catch (e) {
+      console.error("Failed to parse selectedVariableIndex from localStorage", e);
+      setSelectedIdx([]);
+    }
   }, [variables]);
 
   /* ── handlers ──────────────────────────────────────── */
@@ -143,19 +151,45 @@ export default function Dashboard() {
     if (!master.length) return { periods: [], rows: [] };
 
     const periods = splitIntoPeriods(fromDate, toDate, periodicity);
-    const varsToUse =
-      selectedIdx !== "" ? [variables[+selectedIdx]] : variables;
 
-    const rows = varsToUse.map((v) => {
+    let rows;
+
+    if (selectedIdx.length) {
+      // combined row: sum of all chosen variables
+      const chosen = selectedIdx.map((i) => variables[i]);
       const vals = periods.map(({ start, end }) => {
         const rowsInRange = master.filter(({ date }) => {
           const d = new Date(date);
           return d >= start && d <= end;
         });
-        return calcMetric(rowsInRange.map((r) => r[v.name]), metric);
+        return chosen.reduce((sum, v) => {
+          return (
+            sum + calcMetric(rowsInRange.map((r) => r[v.name]), metric)
+          );
+        }, 0);
       });
-      return { ...v, vals };
-    });
+      rows = [
+        {
+          name: "Combined",
+          unit: chosen[0]?.unit ?? "",
+          vals,
+        },
+      ];
+    } else {
+      // no filter → show every variable individually (unchanged behaviour)
+      rows = variables.map((v) => {
+        const vals = periods.map(({ start, end }) => {
+          const rowsInRange = master.filter(({ date }) => {
+            const d = new Date(date);
+            return d >= start && d <= end;
+          });
+          return calcMetric(rowsInRange.map((r) => r[v.name]), metric);
+        });
+        return { ...v, vals };
+      });
+    }
+
+
     return { periods, rows };
   }, [fromDate, toDate, periodicity, metric, variables, selectedIdx]);
 
@@ -229,20 +263,35 @@ export default function Dashboard() {
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Typography variant="subtitle1">Include</Typography>
                   <Select
+                    multiple                              /* NEW */
                     size="small"
                     fullWidth
                     displayEmpty
                     value={selectedIdx}
                     onChange={(e) => {
-                      setSelectedIdx(e.target.value);
-                      localStorage.setItem("selectedVariableIndex", e.target.value);
+                      const val = e.target.value;         // val is an array
+                      setSelectedIdx(val);
+                      localStorage.setItem("selectedVariableIndex", JSON.stringify(val));
                     }}
+                    renderValue={(selected) =>
+                      selected.length
+                        ? selected.map((i) => variables[i]?.name).join(", ")
+                        : <em>Select variable…</em>
+                    }
                   >
-                    <MenuItem value="">
+                    <MenuItem disabled value="">
                       <em>Select variable…</em>
                     </MenuItem>
+
                     {variables.map((v, i) => (
                       <MenuItem key={i} value={i}>
+                        {/* simple checkbox for UX */}
+                        <input
+                          type="checkbox"
+                          checked={selectedIdx.indexOf(i) > -1}
+                          readOnly
+                          style={{ marginRight: 8 }}
+                        />
                         {v.name}
                       </MenuItem>
                     ))}
