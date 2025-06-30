@@ -38,30 +38,41 @@ function ChangePanel({ idx, data, onChange }) {
   const handle = (field, value) => onChange(idx, { ...data, [field]: value });
 
   return (
-    <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2 }}>
-      <Stack direction="column" alignItems="left" spacing={4} sx={{ mb: 1 }}>
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 2,
+        mb: 2,
+        borderRadius: 2,
+        width: '100%',
+        maxWidth: { xs: '100%', md: '50%' },
+        mx: 0 // Left aligned
+      }}
+    >
+      <Stack direction="column" spacing={2}>
 
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-          {/* ─────────── Row 1 : column headers (Start / End) ─────────── */}
-          <Grid item xs={2} >
+        {/* ─────────── Row 1 : column headers (Start / End) ─────────── */}
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={2}>
             <Checkbox
               checked={data.enabled}
               onChange={(e) => handle("enabled", e.target.checked)}
             />
           </Grid>
-          <Grid item xs={5}>
+          <Grid item xs={6} sm={5}>
             <Typography variant="subtitle2">Start date</Typography>
           </Grid>
-          <Grid item xs={5}>
+          <Grid item xs={6} sm={5}>
             <Typography variant="subtitle2">End date</Typography>
           </Grid>
-        </Stack>
-
+        </Grid>
 
         {/* ─────────── Row 2 : two pickers ──────────────── */}
-        <Stack direction="row" alignItems="right" justifyContent="space-between" sx={{ mb: 1 }}>
-          <Grid></Grid>
-          <Grid item xs={5}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={2}>
+            {/* Empty space to align with checkbox above */}
+          </Grid>
+          <Grid item xs={12} sm={5}>
             <LocalizationProvider dateAdapter={AdapterDateFns}>
               <DatePicker
                 value={data.startDate}
@@ -70,7 +81,7 @@ function ChangePanel({ idx, data, onChange }) {
               />
             </LocalizationProvider>
           </Grid>
-          <Grid item xs={5}>
+          <Grid item xs={12} sm={5}>
             <LocalizationProvider dateAdapter={AdapterDateFns}>
               <DatePicker
                 value={data.endDate}
@@ -79,17 +90,17 @@ function ChangePanel({ idx, data, onChange }) {
               />
             </LocalizationProvider>
           </Grid>
-        </Stack>
+        </Grid>
 
-        {/* ─────────── Row 3 : “Change / Between” labels ───────────── */}
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-          <Grid item xs={2}>
+        {/* ─────────── Row 3 : "Change / Between" labels ───────────── */}
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={2}>
             <Typography variant="subtitle2">Change</Typography>
           </Grid>
-          <Grid item xs={5}>
+          <Grid item xs={6} sm={5}>
             <Typography variant="subtitle2">Between</Typography>
           </Grid>
-          <Grid item xs={5}>
+          <Grid item xs={6} sm={5}>
             <Select
               fullWidth
               size="small"
@@ -103,15 +114,17 @@ function ChangePanel({ idx, data, onChange }) {
               ))}
             </Select>
           </Grid>
-        </Stack>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-          <Grid item xs={2}>
-            <Typography variant="subtitle2"></Typography>
+        </Grid>
+
+        {/* ─────────── Row 4 : "Every" row ───────────── */}
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={2}>
+            {/* Empty space */}
           </Grid>
-          <Grid item xs={5}>
+          <Grid item xs={6} sm={5}>
             <Typography variant="body2">Every</Typography>
           </Grid>
-          <Grid item xs={5}>
+          <Grid item xs={6} sm={5}>
             <TextField
               fullWidth
               size="small"
@@ -120,11 +133,11 @@ function ChangePanel({ idx, data, onChange }) {
               onChange={(e) => handle("betweenValue", e.target.value)}
             />
           </Grid>
-        </Stack>
-        <Grid item xs={5} />
+        </Grid>
 
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-          <Grid item xs={2}>
+        {/* ─────────── Row 5 : Change type and "By" ───────────── */}
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={2}>
             <Select
               fullWidth
               size="small"
@@ -135,10 +148,10 @@ function ChangePanel({ idx, data, onChange }) {
               <MenuItem value="Independent">Independent</MenuItem>
             </Select>
           </Grid>
-          <Grid item xs={5}>
+          <Grid item xs={6} sm={5}>
             <Typography variant="body2">By</Typography>
           </Grid>
-          <Grid item xs={5}>
+          <Grid item xs={6} sm={5}>
             <TextField
               fullWidth
               size="small"
@@ -147,17 +160,17 @@ function ChangePanel({ idx, data, onChange }) {
               onChange={(e) => handle("by", e.target.value)}
             />
           </Grid>
-        </Stack>
+        </Grid>
 
         {/* ─────────── Row 6 : (or) + Set-to constant ──────────────── */}
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-          <Grid item xs={4}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={2}>
             <Typography variant="caption">(or)</Typography>
           </Grid>
-          <Grid item xs={5}>
+          <Grid item xs={6} sm={5}>
             <Typography variant="body2">Set to</Typography>
           </Grid>
-          <Grid item xs={5}>
+          <Grid item xs={6} sm={5}>
             <TextField
               fullWidth
               size="small"
@@ -165,17 +178,22 @@ function ChangePanel({ idx, data, onChange }) {
               onChange={(e) => handle("setTo", e.target.value)}
             />
           </Grid>
-        </Stack>
-
-        {/* ─────────── Row 7 : helper line spans across right columns ─*/}
-        <Grid item xs={2} />
-        <Grid item xs={10}>
-          <Typography variant="caption" color="text.secondary">
-            Accepted characters for “By”: numbers, variable names, common
-            operators (+ − * / ^), uncommon functions (Rem, Trunc, Round, ABS,
-            Roundup, Rounddown), logical operators (AND, OR, NOT) and IF(,,).
-          </Typography>
         </Grid>
+
+        {/* ─────────── Row 7 : helper text ─────────────── */}
+        <Grid container spacing={2}>
+          <Grid item xs={12} sm={2}>
+            {/* Empty space */}
+          </Grid>
+          <Grid item xs={12} sm={10}>
+            <Typography variant="caption" color="text.secondary">
+              Accepted characters for "By": numbers, variable names, common
+              operators (+ − * / ^), uncommon functions (Rem, Trunc, Round, ABS,
+              Roundup, Rounddown), logical operators (AND, OR, NOT) and IF(,,).
+            </Typography>
+          </Grid>
+        </Grid>
+
       </Stack>
     </Paper>
   );
@@ -324,7 +342,7 @@ export default function CreateModify() {
   }, []);
 
   // ------------------------- submit --------------------------
- 
+
   const createOrUpdateVariable = () => {
     if (!name.trim() || !dataType || !unit.trim() || initialValue === "") {
       enqueueSnackbar("All fields are required.", { variant: "error" });
@@ -388,7 +406,7 @@ export default function CreateModify() {
     return true;
   };
 
-    const handleSubmit = () => {
+  const handleSubmit = () => {
     if (editMode) {
       if (saveChanges()) navigate("/variables");
     } else {
@@ -540,7 +558,7 @@ export default function CreateModify() {
           />
         ))}
 
-        <Box display="flex" justifyContent="space-between" mt={2}>
+        <Box display="flex" justifyContent="space-between" mt={2} sx={{width: '75%'}}>
           <Box sx={{ width: "25%" }}>
             <Button variant="contained" onClick={addChange}>
               Add another change

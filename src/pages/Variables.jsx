@@ -75,7 +75,7 @@ export default function Variables() {
 
   // ---------------------------------------------------------------------
   return (
-    <Stack direction="column" justifyContent="space-around" spacing={2} ml={2}> 
+    <Stack direction="column" justifyContent="space-around" spacing={2} ml={2} sx={{ flex: 1, width: '100%', height: '100%', ml: 2 }}> 
       {/* Table Section */}
       <Grid item xs={12}>
         <Paper elevation={3} sx={{ borderRadius: 2 }}>
